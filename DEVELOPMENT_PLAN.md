@@ -38,6 +38,7 @@ GUI の表示と点灯ロジックは共通化する。色、明るさ、パタ�
 | 5. 再現確認 | 初見の手順でビルド・書き込み・接続を再現する。README に使用版、配線、コマンド、復旧方法と検証結果を記録する | 手順記載済み。実機の再現確認は未実施 |
 | 6. LED 個数とレインボー | Chrome で 1〜15 個を選び、個数を減らしたときの消灯と、レインボーの色・明るさ・速度を確認する | 2026-11-06 Windows の Chrome でレインボーの速度と LED 個数の変更を実機確認。明るさの個別試験は未記録 |
 | 7. 点滅とフェードの速度範囲 | 操作画面とファームウェアで 0.1〜10 cycle/sec を指定できるようにする | 2026-11-06 実装完了。画面の模擬試験、周期の計算、COM13 への書き込み・BLE 起動を確認。光学的な周期測定は未実施 |
+| 8. 今回の使用範囲での USB 給電 | WS2812B 12個の測定結果と公称入力仕様を照合し、使用範囲の判断を開発記録と README に残す | 2026-11-06 完了。現行の輝度上限で今回想定した使用範囲に給電上の問題はないと判断 |
 
 開発環境は Arduino CLI と Espressif の Arduino ESP32 コアの M5Atom ボード定義。Arduino 標準の C++ を使用する。ボード設定と依存ライブラリの固定版は `firmware/AtomNeoPixel/sketch.yaml`、ビルド・書き込み・操作手順は `README.md` を参照する。[M5Stack の Atom 書き込みガイド](https://docs.m5stack.com/en/arduino/m5atom/program)・[Arduino CLI のビルド仕様](https://docs.arduino.cc/arduino-cli/sketch-build-process/)
 
@@ -63,6 +64,8 @@ GUI の表示と点灯ロジックは共通化する。色、明るさ、パタ�
 | 全消灯 | 10 mA 以下 | 0/255 |
 | 白 50% | 70 mA | 16/255 |
 | 白 100% | 110 mA | 32/255 |
+
+**使用範囲の判断。** 利用者は、今回想定した LED 個数・点灯パターン・点灯色を、現行ファームウェアの輝度上限で使う範囲では、Atom Lite の USB 給電で問題はないと判断した。判断の根拠は 12 個での USB 入力側の測定結果と実機動作。瞬時ピークと、測定構成から外れた条件の電流は未測定。参考値を [README](README.md#usb-給電の参考測定) にも記載した。
 
 白 100% 時の 110 mA は、M5Stack の入力仕様 5 V / 500 mA の電流値に対し 22%。測定した構成の表示値に過負荷を示す値は見られない。M5Stack の旧公開図では Grove 5 V の経路に 0.5 A のヒューズ、新しい公開回路図では USB 側から 1N5819 を通り Grove 5 V の分岐に 1 A 表記の PTC がある。実機の基板リビジョンと Grove 5 V の連続供給定格は未確認。保護部品の表示値と、入力の 500 mA から表示値を引いた差は、Grove の追加供給可能電流を示さない。[M5Stack の入力仕様](https://docs.m5stack.com/ja/core/Atom-Lite)・[M5Stack の旧公開図](https://raw.githubusercontent.com/m5stack/m5-docs/master/docs/assets/img/product_pics/core/minicore/atom/ATOM_LITE_SIMPLE_CIRCUT_20200514.webp)・[M5Stack の公開回路図](https://static-cdn.m5stack.com/resource/docs/products/core/ATOM%20Lite/img-2e58eac3-d9ef-4be4-b486-d4dd9a8324fa.webp)
 
