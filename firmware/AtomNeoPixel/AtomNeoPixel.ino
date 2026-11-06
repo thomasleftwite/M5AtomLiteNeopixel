@@ -152,10 +152,12 @@ void stopWeb() {
 }
 
 void resumeStation() {
-  WiFi.mode(WIFI_STA);
+  // WiFiManager may stop STA immediately. Wait for its start event first.
+  const bool stationReady = WiFi.mode(WIFI_STA) && WiFi.STA.begin(false);
   WiFi.setAutoReconnect(true);
   wifi_config_t config{};
-  wifiConfigured = esp_wifi_get_config(WIFI_IF_STA, &config) == ESP_OK && config.sta.ssid[0] != 0;
+  wifiConfigured = stationReady && esp_wifi_get_config(WIFI_IF_STA, &config) == ESP_OK
+                   && config.sta.ssid[0] != 0;
   if (wifiConfigured && WiFi.status() != WL_CONNECTED) WiFi.begin();
   lastReconnect = millis();
 }

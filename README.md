@@ -1,6 +1,6 @@
 # M5AtomLiteNeopixel
 
-M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.2.2`。LED 個数、色、明るさ、速度、消灯、固定点灯、点滅、フェード、レインボーに対応します。Android の通常操作には同じ LAN 上の Wi-Fi モードを使います。[開発計画](DEVELOPMENT_PLAN.md)
+M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.2.3`。LED 個数、色、明るさ、速度、消灯、固定点灯、点滅、フェード、レインボーに対応します。Android の通常操作には同じ LAN 上の Wi-Fi モードを使います。[開発計画](DEVELOPMENT_PLAN.md)
 
 ## 構成と配線
 
@@ -120,4 +120,4 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 
 ## 動作確認の範囲
 
-Windows の Google Chrome から BLE で接続し、WS2812B のレインボー速度と LED 個数の変更を実機で確認済みです。Windows の BLE API から送った赤・緑・青・消灯も、外付け LED の表示と読み戻した状態が一致しました。点滅とフェードの周期端点はコードと画面の模擬試験で検証しました。Wi-Fi 接続中の白点灯は実機で確認済みです。Android の Chrome からの LAN 操作、Wi-Fi の復旧手順、VPN 経由、macOS での BLE は今後の検証対象です。[検証記録](DEVELOPMENT_PLAN.md#2026-11-06-検証記録)
+Windows の Google Chrome から BLE で接続し、WS2812B のレインボー速度と LED 個数の変更を実機で確認済みです。Windows の BLE API から送った赤・緑・青・消灯も、外付け LED の表示と読み戻した状態が一致しました。点滅とフェードの周期端点はコードと画面の模擬試験で検証しました。Wi-Fi 接続中の白点灯は実機で確認済みです。`v0.2.3` は通常起動で BLE、本体ボタンを押した起動で Wi-Fi の設定用 AP が立ち上がることを実機ログで確認しました。Android の Chrome からの LAN 操作、保存先への接続失敗からの実機復旧、VPN 経由、macOS での BLE は今後の検証対象です。[検証記録](DEVELOPMENT_PLAN.md#2026-11-06-検証記録)
