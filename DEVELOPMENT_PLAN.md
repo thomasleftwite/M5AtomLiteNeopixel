@@ -61,6 +61,13 @@ GUI の表示と点灯ロジックは共通化する。色、明るさ、パタ�
 - `v0.2.3` を Arduino CLI 1.4.1 でビルドした。フラッシュ使用量 1,793,095 バイト（57%）、静的 RAM 62,840 バイト（19%）。COM13 のアプリ領域 `0x10000` に書き込んでハッシュ検証に成功し、通常リセット後に `Mode: BLE` を確認した。差分は Wi-Fi の STA 初期化と記録のみ。
 - `v0.2.3` の設定用 AP 起動後、Atom Lite の LAN 接続ログを確認した。Windows PC から操作画面と `GET /api/state` にアクセスし、どちらも HTTP 200 を受信した。状態取得 API は7バイトの状態データを16進表記で返した。
 - 利用者が `v0.2.3` の設定用 AP を使って Android から接続先 Wi-Fi を設定し、同じ LAN に戻った Android の Chrome から外付け LED を操作できることを確認した。[操作手順](README.md#wi-fi-で接続する)
+- Android の BLE を再確認した。Windows 上の操作画面は HTTP 200 を返していたが、USB デバッグ接続がない状態で Android の `127.0.0.1:8080` は接続を拒否した。Android を USB 接続し、`adb reverse tcp:8080 tcp:8080` で転送を設定したところ、Android から操作画面を取得できた。
+- Android の Bluetooth 設定画面から Chrome の操作画面に戻り、ページ内の「BLE 接続」から `AtomPixel-…` を選択した。利用者が「接続済み」の表示を確認し、Android ログでも GATT 接続とサービス検出が成功した。以前の UUID エラーはこの試行で再現しなかった。今回の BLE 確認は USB 転送を使った開発時の試験で、Android の Chrome からの点灯変更と USB なしでの BLE 操作は未確認。
+
+### 2026-11-06 Android BLE 用 APK
+
+- `0.1.0` の [署名済み APK](android/releases/AtomNeoPixel-0.1.0.apk) を生成。実装とビルド・操作手順は [Android アプリ](android/README.md) にまとめた。
+- APK の署名、対象 SDK、操作画面の HTML と PC 上の HTTP 配信・停止を確認した。Android 実機へのインストール、Chrome の起動、オフラインの BLE 点灯変更は未検証。
 
 ### 2026-11-06 USB 給電の評価
 

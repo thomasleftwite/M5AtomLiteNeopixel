@@ -70,7 +70,7 @@ BLE を切断しても、Atom Lite は直前の点灯設定で動作を続けま
 
 Windows で初回接続時に `Connection attempt failed` が出る場合は、本体ボタンを長押しして水色にし、Windows の Bluetooth 設定で `AtomPixel-XXXXXX` をペアリングしてから Chrome で接続を試してください。機器の状態取得と操作には暗号化された BLE 接続が必要です。[Microsoft の Bluetooth 開発者向け FAQ](https://learn.microsoft.com/en-us/windows/uwp/devices-sensors/bluetooth-dev-faq)
 
-単体 HTML は `node tools/serve-ui.mjs --export <新規HTMLファイル>` で取り出せます。Android では下記の Wi-Fi 手順を使用します。
+単体 HTML は `node tools/serve-ui.mjs --export <新規HTMLファイル>` で取り出せます。Android で BLE を使う場合の試作アプリは [Android アプリの手順](android/README.md) を参照してください。Android で Wi-Fi を使う場合は下記の手順を使用します。
 
 ファームウェアの更新後は、`serve-ui.mjs` を再起動して Chrome の画面を再読み込みしてください。単体 HTML を使う場合は最新版を書き出します。
 
