@@ -18,6 +18,7 @@ std::atomic<bool> windowEnabled{false};
 uint32_t nextAdvertisingTry = 0;
 BLECharacteristic *stateCharacteristic = nullptr;
 QueueHandle_t commands = nullptr;
+LedState currentState = DEFAULT_STATE;
 
 void publishState(const LedState &state) {
   uint8_t bytes[STATE_SIZE];
@@ -44,11 +45,10 @@ class SecurityCallbacks : public BLESecurityCallbacks {
 class CommandCallbacks : public BLECharacteristicCallbacks {
   void onWrite(BLECharacteristic *characteristic) override {
     const String value = characteristic->getValue();
-    LedState command;
-    if (decodeState(reinterpret_cast<const uint8_t *>(value.c_str()), value.length(), command)) {
-      xQueueOverwrite(commands, &command);
+    if (decodeState(reinterpret_cast<const uint8_t *>(value.c_str()), value.length(), currentState)) {
+      xQueueOverwrite(commands, &currentState);
       // Reads, writes and subscription updates are serialized by the GATT task.
-      publishState(command);
+      publishState(currentState);
       stateCharacteristic->notify();
     }
   }
@@ -82,7 +82,8 @@ void BleControl::begin(const char *name, const LedState &initial) {
   auto *subscription = new BLE2902;
   subscription->setAccessPermissions(ESP_GATT_PERM_READ_ENCRYPTED | ESP_GATT_PERM_WRITE_ENCRYPTED);
   stateCharacteristic->addDescriptor(subscription);
-  publishState(initial);
+  currentState = initial;
+  publishState(currentState);
   service->start();
   auto *advertisement = BLEDevice::getAdvertising();
   BLEAdvertisementData payload;

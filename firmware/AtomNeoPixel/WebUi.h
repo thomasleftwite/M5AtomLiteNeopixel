@@ -25,17 +25,23 @@ const char UI_PAGE[] PROGMEM = R"ATOMHTML(<!doctype html>
 <form id="controls">
   <fieldset id="settings" disabled>
     <legend>外付け LED</legend>
+    <label>LED 個数
+      <select id="ledCount"></select>
+    </label>
     <label>パターン
       <select id="pattern">
         <option value="0">消灯</option>
         <option value="1">固定点灯</option>
         <option value="2">点滅</option>
         <option value="3">フェード</option>
+        <option value="4">レインボー</option>
       </select>
     </label>
     <label>色 <input id="color" type="color" value="#ffffff"></label>
     <label>明るさ（機器の上限に対する割合）<input id="brightness" type="range" min="0" max="100" value="50"></label>
-    <label>速度 <input id="speed" type="range" min="0" max="100" value="50"></label>
+    <label>速度 <input id="speed" type="range" min="0" max="100" value="50">
+      <output id="speedValue" for="speed">50%</output>
+    </label>
     <button type="submit">反映する</button>
   </fieldset>
 </form>
@@ -44,6 +50,8 @@ const char UI_PAGE[] PROGMEM = R"ATOMHTML(<!doctype html>
 const SERVICE = '251c86a0-3990-4b1e-bb96-5ed47d413b60';
 const COMMAND = '251c86a1-3990-4b1e-bb96-5ed47d413b60';
 const STATE = '251c86a2-3990-4b1e-bb96-5ed47d413b60';
+const RAINBOW = 4;
+const MAX_LED_COUNT = 15;
 const localUi = ['localhost', '127.0.0.1'].includes(location.hostname)
   || ['file:', 'content:'].includes(location.protocol);
 const byId = (id) => document.getElementById(id);
@@ -51,12 +59,21 @@ const connect = byId('connect');
 const refresh = byId('refresh');
 const settings = byId('settings');
 const status = byId('status');
+const pattern = byId('pattern');
+const color = byId('color');
+const speed = byId('speed');
+const ledCount = byId('ledCount');
+for (let count = 1; count <= MAX_LED_COUNT; count++) {
+  ledCount.add(new Option(count, count));
+}
+ledCount.value = String(MAX_LED_COUNT);
 let device;
 let commandCharacteristic;
 let stateCharacteristic;
 let ready = false;
 let busy = false;
 let edited = false;
+let rainbowSpeed = false;
 
 function updateControls() {
   settings.disabled = busy || !ready;
@@ -70,7 +87,7 @@ function toHex(bytes) {
 }
 
 function fromHex(hex) {
-  if (!/^(?:[0-9a-f]{2}){6}$/i.test(hex)) throw new Error('機器の応答が不正です');
+  if (!/^(?:[0-9a-f]{2}){6,7}$/i.test(hex)) throw new Error('機器の応答が不正です');
   return Uint8Array.from(hex.match(/../g), (pair) => Number.parseInt(pair, 16));
 }
 
@@ -78,21 +95,43 @@ function fromView(view) {
   return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
 }
 
+function updatePatternControls(restoredSpeed) {
+  const isRainbow = Number(pattern.value) === RAINBOW;
+  const previousSpeed = Number(speed.value);
+  color.disabled = isRainbow;
+  if (isRainbow !== rainbowSpeed) {
+    speed.min = isRainbow ? '1' : '0';
+    speed.max = isRainbow ? '60' : '100';
+    speed.value = isRainbow ? 1 + Math.round(previousSpeed * 59 / 100)
+      : Math.round((previousSpeed - 1) * 100 / 59);
+    rainbowSpeed = isRainbow;
+  }
+  if (restoredSpeed !== undefined) speed.value = restoredSpeed;
+  byId('speedValue').textContent = isRainbow
+    ? (speed.value === '60' ? '1' : speed.value + '/60') + ' cycle/sec'
+    : speed.value + '%';
+}
+
 function showState(bytes) {
-  if (bytes.length !== 6 || bytes[0] > 3 || bytes[4] > 100 || bytes[5] > 100) {
+  if (bytes.length === 6) throw new Error('機器のファームウェアを更新してください。');
+  const isRainbow = bytes[0] === RAINBOW;
+  if (bytes.length !== 7 || bytes[0] > RAINBOW || bytes[4] > 100
+      || (isRainbow ? bytes[5] < 1 || bytes[5] > 60 : bytes[5] > 100)
+      || bytes[6] < 1 || bytes[6] > MAX_LED_COUNT) {
     throw new Error('機器の状態が不正です');
   }
-  byId('pattern').value = String(bytes[0]);
-  byId('color').value = '#' + toHex(bytes.subarray(1, 4));
+  pattern.value = String(bytes[0]);
+  color.value = '#' + toHex(bytes.subarray(1, 4));
   byId('brightness').value = String(bytes[4]);
-  byId('speed').value = String(bytes[5]);
+  ledCount.value = String(bytes[6]);
+  updatePatternControls(bytes[5]);
   edited = false;
 }
 
 function selectedState() {
-  const rgb = Number.parseInt(byId('color').value.slice(1), 16);
-  return Uint8Array.of(Number(byId('pattern').value), rgb >> 16, (rgb >> 8) & 255,
-    rgb & 255, Number(byId('brightness').value), Number(byId('speed').value));
+  const rgb = Number.parseInt(color.value.slice(1), 16);
+  return Uint8Array.of(Number(pattern.value), rgb >> 16, (rgb >> 8) & 255,
+    rgb & 255, Number(byId('brightness').value), Number(speed.value), Number(ledCount.value));
 }
 
 async function requestState(bytes) {
@@ -174,7 +213,10 @@ async function refreshState() {
 }
 
 refresh.addEventListener('click', () => withControls(refreshState));
-byId('controls').addEventListener('input', () => { edited = true; });
+byId('controls').addEventListener('input', (event) => {
+  edited = true;
+  if (event.target === pattern || event.target === speed) updatePatternControls();
+});
 byId('controls').addEventListener('submit', (event) => {
   event.preventDefault();
   withControls(async () => {

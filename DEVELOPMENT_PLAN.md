@@ -1,6 +1,6 @@
 # M5AtomLiteNeopixel 開発計画
 
-2026-11-06 策定。目標は試作版 `v0.1.0`。
+2026-11-06 策定。対象は試作版 `v0.2.0`。
 
 ## 目的と対象
 
@@ -24,7 +24,7 @@ GUI の表示と点灯ロジックは共通化する。色、明るさ、パタ�
 
 外付け LED は WS2812B。Atom Lite 側の Grove は白線の GPIO32 を `DIN` へ、赤線の 5 V を `5V` へ、黒線の GND を `GND` へ接続する。データは GRB 順の 800 kbit/s。信号レベルの適合は使用している LED の仕様と点灯試験で確認する。[Atom Lite](https://docs.m5stack.com/ja/core/Atom-Lite)・[Worldsemi の WS2812B データシート](https://www.world-semi.co.kr/_files/ugd/89cd03_1023b0e9d135431aa1e6491bfc318112.pdf)
 
-外付け LED は USB 給電を前提とし、最大 15 個で固定する。`LED_COUNT` の初期値は 15。接続数に合わせて 1〜15 で変更でき、範囲外はコンパイルエラーにする。全パターンに共通の輝度上限 `LED_BRIGHTNESS_MAX = 32`（PWM 0〜255）を適用する。
+外付け LED は USB 給電を前提とし、最大 15 個で固定する。GUI で 1〜15 個を指定でき、初期値は 15 個。指定個数より後ろの LED へは消灯を送る。全パターンに共通の輝度上限 `LED_BRIGHTNESS_MAX = 32`（PWM 0〜255）を適用する。レインボーは指定色を使わず、先頭から指定個数までを同じ色で連続的に変化させる。設定範囲は毎分 1〜60 周で、速度端点は 1 周 60 秒と 1 秒。
 
 ## 開発・検証 ToDo
 
@@ -36,6 +36,7 @@ GUI の表示と点灯ロジックは共通化する。色、明るさ、パタ�
 | 3. Wi-Fi 試作 | 設定用 AP、誤った Wi-Fi 設定からの復旧、LAN 操作、自動再接続を確認する。Android のモバイル回線など、設置 LAN の外側から VPN 経由の操作を確認する | ソース実装済み。GUI の模擬試験合格、実機・VPN 未検証 |
 | 4. 統合 | モードの切り替え・電源再投入での復元、全パターン、3 OS の操作を確認する | 未検証 |
 | 5. 再現確認 | 初見の手順でビルド・書き込み・接続を再現する。README に使用版、配線、コマンド、復旧方法と検証結果を記録する | 手順記載済み。実機の再現確認は未実施 |
+| 6. LED 個数とレインボー | Chrome で 1〜15 個を選び、個数を減らしたときの消灯と、レインボーの色・明るさ・速度を確認する | 2026-11-06 周期の計算と画面の模擬試験に合格。COM13 に書き込み、BLE 起動を確認。新機能の実点灯は未確認 |
 
 開発環境は Arduino CLI と Espressif の Arduino ESP32 コアの M5Atom ボード定義。Arduino 標準の C++ を使用する。ボード設定と依存ライブラリの固定版は `firmware/AtomNeoPixel/sketch.yaml`、ビルド・書き込み・操作手順は `README.md` を参照する。[M5Stack の Atom 書き込みガイド](https://docs.m5stack.com/en/arduino/m5atom/program)・[Arduino CLI のビルド仕様](https://docs.arduino.cc/arduino-cli/sketch-build-process/)
 
@@ -48,3 +49,4 @@ GUI の表示と点灯ロジックは共通化する。色、明るさ、パタ�
 - 利用者は ChatGPT 内蔵ブラウザの機器選択後に `Connection attempt failed` を確認した。Windows の BLE API で機器検出・GATT 接続・サービス取得までは成功し、ペアリング前の状態読み取りは `Insufficient Authentication`。Windows で明示的にペアリングした後は、6 バイトの状態読み取りと通知登録に成功した。内蔵ブラウザのエラーと認証エラーの因果関係は未確認。
 - 外付け LED の型番と配線を WS2812B・GPIO32 に訂正。Arduino CLI 1.4.1 の `atom` プロファイルで再ビルドし、COM13 への書き込みハッシュと BLE モードでの再起動を確認。
 - Windows の BLE API で赤・緑・青・消灯のコマンドを順に送り、Atom Lite から読み戻した状態が全て一致した。利用者が外付け WS2812B で赤 → 緑 → 青 → 消灯を確認した。
+- `v0.2.0` を Arduino CLI 1.4.1 でビルド。フラッシュ使用量 1,793,951 バイト（57%）、静的 RAM 62,888 バイト（19%）。COM13 の書き込みハッシュ検証と BLE 起動を確認した。レインボーの周期 60 秒・2 秒・1 秒の計算をコンパイラで検証した。BLE と Wi-Fi の GUI 模擬試験では、個数 1〜15、速度端点、色指定の無効化、送信データを確認した。

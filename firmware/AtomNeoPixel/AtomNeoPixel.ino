@@ -20,7 +20,7 @@ constexpr uint32_t RECONNECT_INTERVAL_MS = 15000;
 constexpr char API_PATH[] = "/api/state";
 constexpr char CONTROL_HEADER[] = "X-Atom-Control";
 
-Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip(LED_COUNT_MAX, LED_PIN, NEO_GRB + NEO_KHZ800);
 Adafruit_NeoPixel indicator(1, INDICATOR_PIN, NEO_GRB + NEO_KHZ800);
 WebServer server(80);
 WiFiManager wifiManager;
@@ -44,6 +44,7 @@ void renderTask(void *) {
   LedState active = DEFAULT_STATE;
   uint32_t patternStart = millis();
   uint32_t previousColor = 0;
+  uint8_t previousCount = active.ledCount;
   uint32_t previousIndicator = 0;
   for (;;) {
     const uint32_t now = millis();
@@ -52,13 +53,18 @@ void renderTask(void *) {
       if (active.pattern != command.pattern || active.speed != command.speed) patternStart = now;
       active = command;
     }
-    const uint8_t level = frameBrightness(active, now - patternStart);
-    const uint32_t color = strip.Color(active.red * level / 255, active.green * level / 255,
-                                       active.blue * level / 255);
-    if (color != previousColor) {
-      strip.fill(color);
+    const uint32_t elapsed = now - patternStart;
+    const uint8_t level = frameBrightness(active, elapsed);
+    const uint32_t color = active.pattern == Rainbow
+        ? strip.ColorHSV(rainbowHue(elapsed, active.speed), 255, level)
+        : strip.Color(active.red * level / 255, active.green * level / 255,
+                      active.blue * level / 255);
+    if (color != previousColor || active.ledCount != previousCount) {
+      strip.clear();
+      strip.fill(color, 0, active.ledCount);
       strip.show();
       previousColor = color;
+      previousCount = active.ledCount;
     }
     const uint32_t nextIndicator = indicatorColor;
     if (nextIndicator != previousIndicator) {
@@ -83,15 +89,16 @@ int hexDigit(char digit) {
 }
 
 bool parseHttpState(const String &body, LedState &command) {
-  if (body.length() != 2 * STATE_SIZE) return false;
+  if (body.length() != 2 * STATE_SIZE && body.length() != 2 * LEGACY_STATE_SIZE) return false;
+  const size_t size = body.length() / 2;
   uint8_t bytes[STATE_SIZE];
-  for (size_t i = 0; i < STATE_SIZE; ++i) {
+  for (size_t i = 0; i < size; ++i) {
     const int high = hexDigit(body[2 * i]);
     const int low = hexDigit(body[2 * i + 1]);
     if (high < 0 || low < 0) return false;
     bytes[i] = high * 16 + low;
   }
-  return decodeState(bytes, sizeof(bytes), command);
+  return decodeState(bytes, size, command);
 }
 
 bool requireLocalAddress() {
@@ -131,7 +138,7 @@ void configureWeb() {
       server.send(403, "text/plain", "Control header required");
       return;
     }
-    LedState command;
+    LedState command = state;
     if (!parseHttpState(server.arg("plain"), command)) {
       server.send(400, "text/plain", "Invalid LED state");
       return;

@@ -1,10 +1,12 @@
 # M5AtomLiteNeopixel
 
-M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.1.0`。色、明るさ、速度、消灯、固定点灯、点滅、フェードに対応します。[開発計画](DEVELOPMENT_PLAN.md)
+M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.2.0`。LED 個数、色、明るさ、速度、消灯、固定点灯、点滅、フェード、レインボーに対応します。[開発計画](DEVELOPMENT_PLAN.md)
 
 ## 配線と設定
 
-WS2812B の `DIN` を Atom Lite の Grove ポートの GPIO32（白線）、`5V` を 5 V（赤線）、`GND` を GND（黒線）に接続します。線色は Atom Lite 側の Grove ケーブルの配色です。USB 給電を前提とし、外付け LED は最大15個です。実際の接続数を `firmware/AtomNeoPixel/LedState.h` の `LED_COUNT` に設定します。初期値は15で、1〜15以外はビルドエラーになります。GUI の明るさ100%はファームウェアの輝度上限 PWM 32/255 に相当します。
+WS2812B の `DIN` を Atom Lite の Grove ポートの GPIO32（白線）、`5V` を 5 V（赤線）、`GND` を GND（黒線）に接続します。線色は Atom Lite 側の Grove ケーブルの配色です。USB 給電を前提とし、外付け LED は最大15個です。GUI の「LED 個数」で1〜15を選択します。起動時は15個・消灯で始まり、個数を減らすと指定個数より後ろの LED は消灯します。GUI の明るさ100%はファームウェアの輝度上限 PWM 32/255 に相当します。
+
+「レインボー」を選ぶと、選択した個数の LED が同じ色で赤から緑・青を経て連続的に循環します。色ピッカーは無効になり、明るさと速度を設定できます。速度は 1/60〜1 cycle/sec（1周60秒〜1秒）で、1分当たり1周刻みです。「反映する」を押すと設定が適用されます。
 
 ## ビルドと書き込み
 
@@ -39,6 +41,8 @@ node tools/serve-ui.mjs
 Windows で初回接続時に `Connection attempt failed` が出る場合は、本体ボタンを長押しして水色にし、Windows の Bluetooth 設定で `AtomPixel-XXXXXX` をペアリングしてから Chrome で接続を試してください。機器の状態取得と操作には暗号化された BLE 接続が必要です。[Microsoft の Bluetooth 開発者向け FAQ](https://learn.microsoft.com/en-us/windows/uwp/devices-sensors/bluetooth-dev-faq)
 
 単体 HTML は `node tools/serve-ui.mjs --export <新規HTMLファイル>` で取り出せます。Android の Chrome でこのファイルを直接開く方法と、Android 上のループバック配信方法は実機で確認する予定です。
+
+`v0.2.0` への更新後は、`serve-ui.mjs` を再起動して Chrome の画面を再読み込みしてください。単体 HTML を使う場合は最新版を書き出します。状態データは LED 個数が末尾に加わり7バイトになりました。旧6バイト形式の点灯コマンドは、現在の LED 個数で適用します。
 
 ### Wi-Fi
 
