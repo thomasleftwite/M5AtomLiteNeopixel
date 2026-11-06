@@ -28,13 +28,15 @@ arduino-cli monitor --port COMx --config baudrate=115200
 
 ### BLE
 
-Windows・macOS では、Node.js が入った端末で次を実行し、Chrome で `http://127.0.0.1:8080/` を開きます。配信は端末内のループバックだけで行います。
+Windows・macOS では、Node.js が入った端末で次を実行し、Google Chrome アプリのアドレスバーに `http://127.0.0.1:8080/` を入力します。配信は端末内のループバックだけで行います。ChatGPT 内蔵ブラウザでの BLE 接続は確認できていません。
 
 ```powershell
 node tools/serve-ui.mjs
 ```
 
 本体ボタンを約1.5秒押すと、内蔵 LED が水色になり、60秒間 BLE の接続を受け付けます。画面の「BLE 接続」から `AtomPixel-XXXXXX` を選び、必要に応じて OS のペアリング操作を行います。設定変更後に「反映する」を押します。
+
+Windows で初回接続時に `Connection attempt failed` が出る場合は、本体ボタンを長押しして水色にし、Windows の Bluetooth 設定で `AtomPixel-XXXXXX` をペアリングしてから Chrome で接続を試してください。機器の状態取得と操作には暗号化された BLE 接続が必要です。[Microsoft の Bluetooth 開発者向け FAQ](https://learn.microsoft.com/en-us/windows/uwp/devices-sensors/bluetooth-dev-faq)
 
 単体 HTML は `node tools/serve-ui.mjs --export <新規HTMLファイル>` で取り出せます。Android の Chrome でこのファイルを直接開く方法と、Android 上のループバック配信方法は実機で確認する予定です。
 
