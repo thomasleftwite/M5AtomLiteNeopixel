@@ -4,7 +4,7 @@
 
 ## 目的と対象
 
-M5Stack Atom Lite に接続した Unit RGB LED を、Windows・macOS・Android の Chrome から操作する。近距離では Wi-Fi やインターネットがない状態で初回から BLE 操作できる構成を目指す。設置時はローカル Wi-Fi に接続し、外出先からも操作できるようにする。初版の想定は Atom Lite 1 台、同時に操作する端末は 1 台。GUI には色、明るさ、消灯、固定点灯、点滅、フェード、速度、接続状態を含める。
+M5Stack Atom Lite に接続した外付け WS2812B を、Windows・macOS・Android の Chrome から操作する。近距離では Wi-Fi やインターネットがない状態で初回から BLE 操作できる構成を目指す。設置時はローカル Wi-Fi に接続し、外出先からも操作できるようにする。初版の想定は Atom Lite 1 台、同時に操作する端末は 1 台。GUI には色、明るさ、消灯、固定点灯、点滅、フェード、速度、接続状態を含める。
 
 ## 通信方式と起動
 
@@ -22,7 +22,7 @@ GUI の表示と点灯ロジックは共通化する。色、明るさ、パタ�
 
 ## LED の配線と USB 給電
 
-Unit RGB LED は SK6812。Grove の信号は黄線の GPIO26、電源は赤線の 5 V、GND は黒線。白線は LED 側で未接続。ストリップの信号入力側へ接続する。信号レベルの適合は実物の型番と波形で確認する。[Atom Lite](https://docs.m5stack.com/ja/core/Atom-Lite)・[Unit RGB LED](https://docs.m5stack.com/en/unit/Unit_RGB_LED)
+外付け LED は WS2812B。Atom Lite 側の Grove は白線の GPIO32 を `DIN` へ、赤線の 5 V を `5V` へ、黒線の GND を `GND` へ接続する。データは GRB 順の 800 kbit/s。信号レベルの適合は使用している LED の仕様と点灯試験で確認する。[Atom Lite](https://docs.m5stack.com/ja/core/Atom-Lite)・[Worldsemi の WS2812B データシート](https://www.world-semi.co.kr/_files/ugd/89cd03_1023b0e9d135431aa1e6491bfc318112.pdf)
 
 外付け LED は USB 給電を前提とし、最大 15 個で固定する。`LED_COUNT` の初期値は 15。接続数に合わせて 1〜15 で変更でき、範囲外はコンパイルエラーにする。全パターンに共通の輝度上限 `LED_BRIGHTNESS_MAX = 32`（PWM 0〜255）を適用する。
 
@@ -31,8 +31,8 @@ Unit RGB LED は SK6812。Grove の信号は黄線の GPIO26、電源は赤線�
 | 段階 | 作業と完了条件 | 状態 |
 | --- | --- | --- |
 | 0. 計画 | BLE と Wi-Fi の用途、起動方式、LED 数の仕様を記録する。成果物はこのファイル | 2026-11-06 更新。外付け LED は最大 15 個 |
-| 1. 基板と LED | Arduino CLI で Atom Lite 向けにビルドし、USB で書き込む。GPIO26 で低輝度の赤・緑・青・消灯を確認する | 2026-11-06 ビルド・COM13 への書き込み・起動を確認。外付け LED の点灯は未確認 |
-| 2. BLE 試作 | Windows・macOS・Android の Chrome で、キャッシュや初回 Web アクセスに頼らず、ネット接続なしで画面起動・機器選択・色変更・切断後の再接続まで確認する | 2026-11-06 Windows の BLE API でペアリング後の状態取得・通知登録を確認。Chrome アプリでの実機操作は未確認 |
+| 1. 基板と LED | Arduino CLI で Atom Lite 向けにビルドし、USB で書き込む。GPIO32 の WS2812B で低輝度の赤・緑・青・消灯を確認する | 2026-11-06 完了。GPIO32 版のビルド・COM13 への書き込み・起動と、外付け LED の赤・緑・青・消灯を確認 |
+| 2. BLE 試作 | Windows・macOS・Android の Chrome で、キャッシュや初回 Web アクセスに頼らず、ネット接続なしで画面起動・機器選択・色変更・切断後の再接続まで確認する | 2026-11-06 Windows の BLE API でペアリング後の状態取得・通知登録と、GPIO32 版での点灯操作を確認。Chrome アプリでの実機操作は未確認 |
 | 3. Wi-Fi 試作 | 設定用 AP、誤った Wi-Fi 設定からの復旧、LAN 操作、自動再接続を確認する。Android のモバイル回線など、設置 LAN の外側から VPN 経由の操作を確認する | ソース実装済み。GUI の模擬試験合格、実機・VPN 未検証 |
 | 4. 統合 | モードの切り替え・電源再投入での復元、全パターン、3 OS の操作を確認する | 未検証 |
 | 5. 再現確認 | 初見の手順でビルド・書き込み・接続を再現する。README に使用版、配線、コマンド、復旧方法と検証結果を記録する | 手順記載済み。実機の再現確認は未実施 |
@@ -46,3 +46,5 @@ Unit RGB LED は SK6812。Grove の信号は黄線の GPIO26、電源は赤線�
 - 共通 GUI の HTML 書き出し、JavaScript 構文、ローカル配信、BLE と Wi-Fi の状態取得・設定送信を模擬環境で確認。
 - Codex の隔離環境では、一時ディレクトリ名の波括弧がビルド時に欠落してコンパイラを参照できず、COM13 のアクセスも拒否された。通常の Windows 一時ディレクトリと COM13 へのアクセス権を使用してビルド・書き込みを確認した。
 - 利用者は ChatGPT 内蔵ブラウザの機器選択後に `Connection attempt failed` を確認した。Windows の BLE API で機器検出・GATT 接続・サービス取得までは成功し、ペアリング前の状態読み取りは `Insufficient Authentication`。Windows で明示的にペアリングした後は、6 バイトの状態読み取りと通知登録に成功した。内蔵ブラウザのエラーと認証エラーの因果関係は未確認。
+- 外付け LED の型番と配線を WS2812B・GPIO32 に訂正。Arduino CLI 1.4.1 の `atom` プロファイルで再ビルドし、COM13 への書き込みハッシュと BLE モードでの再起動を確認。
+- Windows の BLE API で赤・緑・青・消灯のコマンドを順に送り、Atom Lite から読み戻した状態が全て一致した。利用者が外付け WS2812B で赤 → 緑 → 青 → 消灯を確認した。

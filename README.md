@@ -1,10 +1,10 @@
 # M5AtomLiteNeopixel
 
-M5Stack Atom Lite と外付け Unit RGB LED を Chrome から操作する試作版 `v0.1.0`。色、明るさ、速度、消灯、固定点灯、点滅、フェードに対応します。[開発計画](DEVELOPMENT_PLAN.md)
+M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.1.0`。色、明るさ、速度、消灯、固定点灯、点滅、フェードに対応します。[開発計画](DEVELOPMENT_PLAN.md)
 
 ## 配線と設定
 
-Atom Lite の Grove ポートにストリップの信号入力側を接続します。黄線は GPIO26、赤線は 5 V、黒線は GND です。USB 給電を前提とし、外付け LED は最大15個です。実際の接続数を `firmware/AtomNeoPixel/LedState.h` の `LED_COUNT` に設定します。初期値は15で、1〜15以外はビルドエラーになります。GUI の明るさ100%はファームウェアの輝度上限 PWM 32/255 に相当します。
+WS2812B の `DIN` を Atom Lite の Grove ポートの GPIO32（白線）、`5V` を 5 V（赤線）、`GND` を GND（黒線）に接続します。線色は Atom Lite 側の Grove ケーブルの配色です。USB 給電を前提とし、外付け LED は最大15個です。実際の接続数を `firmware/AtomNeoPixel/LedState.h` の `LED_COUNT` に設定します。初期値は15で、1〜15以外はビルドエラーになります。GUI の明るさ100%はファームウェアの輝度上限 PWM 32/255 に相当します。
 
 ## ビルドと書き込み
 

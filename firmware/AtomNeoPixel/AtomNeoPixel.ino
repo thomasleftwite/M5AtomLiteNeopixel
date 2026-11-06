@@ -10,7 +10,7 @@
 #include "LedState.h"
 #include "WebUi.h"
 
-constexpr uint8_t LED_PIN = 26;
+constexpr uint8_t LED_PIN = 32;  // WS2812B DIN on the Grove port.
 constexpr uint8_t INDICATOR_PIN = 27;
 constexpr uint8_t BUTTON_PIN = 39;
 constexpr uint32_t MODE_HOLD_MS = 500;
