@@ -33,7 +33,7 @@ GUI の表示と点灯ロジックは共通化する。色、明るさ、パタ�
 | 0. 計画 | BLE と Wi-Fi の用途、起動方式、LED 数の仕様を記録する。成果物はこのファイル | 2026-11-06 更新。外付け LED は最大 15 個 |
 | 1. 基板と LED | Arduino CLI で Atom Lite 向けにビルドし、USB で書き込む。GPIO32 の WS2812B で低輝度の赤・緑・青・消灯を確認する | 2026-11-06 完了。GPIO32 版のビルド・COM13 への書き込み・起動と、外付け LED の赤・緑・青・消灯を確認 |
 | 2. BLE 試作 | Windows・macOS・Android の Chrome で、キャッシュや初回 Web アクセスに頼らず、ネット接続なしで画面起動・機器選択・色変更・切断後の再接続まで確認する | 2026-11-06 Windows の BLE API で状態取得・通知登録を確認。Windows の Chrome で BLE 経由の実機操作を確認。macOS・Android と初回オフライン手順は未検証 |
-| 3. Wi-Fi 試作 | 設定用 AP、誤った Wi-Fi 設定からの復旧、LAN 操作、自動再接続を確認する。Android のモバイル回線など、設置 LAN の外側から VPN 経由の操作を確認する | ソース実装済み。GUI の模擬試験合格、実機・VPN 未検証 |
+| 3. Wi-Fi 試作 | 設定用 AP、誤った Wi-Fi 設定からの復旧、LAN 操作、自動再接続を確認する。Android のモバイル回線など、設置 LAN の外側から VPN 経由の操作を確認する | GUI の模擬試験合格。2026-11-06 利用者が Wi-Fi 接続状態で白点灯を確認。接続復旧と VPN は未検証 |
 | 4. 統合 | モードの切り替え・電源再投入での復元、全パターン、3 OS の操作を確認する | 未検証 |
 | 5. 再現確認 | 初見の手順でビルド・書き込み・接続を再現する。README に使用版、配線、コマンド、復旧方法と検証結果を記録する | 手順記載済み。実機の再現確認は未実施 |
 | 6. LED 個数とレインボー | Chrome で 1〜15 個を選び、個数を減らしたときの消灯と、レインボーの色・明るさ・速度を確認する | 2026-11-06 Windows の Chrome でレインボーの速度と LED 個数の変更を実機確認。明るさの個別試験は未記録 |
@@ -53,3 +53,19 @@ GUI の表示と点灯ロジックは共通化する。色、明るさ、パタ�
 - `v0.2.0` を Arduino CLI 1.4.1 でビルド。フラッシュ使用量 1,793,951 バイト（57%）、静的 RAM 62,888 バイト（19%）。COM13 の書き込みハッシュ検証と BLE 起動を確認した。レインボーの周期 60 秒・2 秒・1 秒の計算をコンパイラで検証した。BLE と Wi-Fi の GUI 模擬試験では、個数 1〜15、速度端点、色指定の無効化、送信データを確認した。
 - 利用者が Windows の Google Chrome から BLE で接続し、WS2812B のレインボー速度と LED 個数を変更できたことを確認した。
 - `v0.2.1` を Arduino CLI 1.4.1 でビルドし、COM13 への書き込みハッシュ検証と BLE 起動を確認。点滅とフェードの周期 10 秒・100 ms、レインボーの周期 60 秒・1 秒の計算をコンパイラで検証した。画面の模擬試験で両モードの表示、刻み、送信値を確認した。
+
+### 2026-11-06 USB 給電の評価
+
+利用者が Atom Lite の USB 入力側で測定した。Wi-Fi 接続、WS2812B 12 個、USB 給電の条件。計器の機種・サンプリング条件、USB 入力電圧、LED 側電圧、瞬時ピークは未記録。
+
+| 外付け LED | USB 入力電流の表示値 | v0.2.1 での RGB 各色の指令値 |
+| --- | ---: | ---: |
+| 全消灯 | 10 mA 以下 | 0/255 |
+| 白 50% | 70 mA | 16/255 |
+| 白 100% | 110 mA | 32/255 |
+
+白 100% 時の 110 mA は、M5Stack の入力仕様 5 V / 500 mA の電流値に対し 22%。測定した構成の表示値に過負荷を示す値は見られない。M5Stack の旧公開図では Grove 5 V の経路に 0.5 A のヒューズ、新しい公開回路図では USB 側から 1N5819 を通り Grove 5 V の分岐に 1 A 表記の PTC がある。実機の基板リビジョンと Grove 5 V の連続供給定格は未確認。保護部品の表示値と、入力の 500 mA から表示値を引いた差は、Grove の追加供給可能電流を示さない。[M5Stack の入力仕様](https://docs.m5stack.com/ja/core/Atom-Lite)・[M5Stack の旧公開図](https://raw.githubusercontent.com/m5stack/m5-docs/master/docs/assets/img/product_pics/core/minicore/atom/ATOM_LITE_SIMPLE_CIRCUT_20200514.webp)・[M5Stack の公開回路図](https://static-cdn.m5stack.com/resource/docs/products/core/ATOM%20Lite/img-2e58eac3-d9ef-4be4-b486-d4dd9a8324fa.webp)
+
+GPIO32 は先頭 WS2812B の DIN だけを駆動し、LED の点灯電流は Grove の 5 V と GND を通る。ESP32-PICO の GPIO 出力特性は最大駆動設定で High 40 mA、Low 28 mA が代表値。WS2812B の DIN 入力電流は静的な仕様で最大 ±1 µA。データ信号の電圧余裕は別に評価する。WS2812B の資料には High 最小値が 0.7×VDD の版と、5 V 時に 2.7 V の V5 資料がある。実装品のリビジョンと DIN の波形は未確認。[ESP32-PICO データシート表18](https://documentation.espressif.com/esp32-pico_series_datasheet_en.html)・[WS2812B 旧版データシート](https://cdn.sparkfun.com/datasheets/BreakoutBoards/WS2812B.pdf)・[WS2812B-V5 データシート](https://www.world-semi.co.kr/_files/ugd/89cd03_1023b0e9d135431aa1e6491bfc318112.pdf)
+
+ESP32-PICO の 3.3 V 側では、モデムスリープの代表値が動作周波数に応じて 20〜68 mA、Wi-Fi 送信のピークが測定条件により 205〜370 mA。USB 5 V 側の表示値とは測定条件と電圧が異なる。全消灯時の 10 mA 以下は、LAN から状態取得を繰り返しながら数十秒間の平均と最大値を取り直す。白 100% と Wi-Fi 通信・再接続が重なるときは USB 側の瞬時電流とストリップ先頭・末端の電源電圧を確認し、リセットや色化けの有無を記録する。[ESP32-PICO データシート表19・20](https://documentation.espressif.com/esp32-pico_series_datasheet_en.html)
