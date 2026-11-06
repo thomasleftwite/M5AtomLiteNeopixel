@@ -62,7 +62,7 @@ arduino-cli monitor --port COMx --config baudrate=115200
 ### BLE で接続する
 
 1. Atom Lite の本体ボタンを押さずに電源を入れます。PC の Bluetooth をオンにします。
-2. Node.js が入った PC で、リポジトリ直下から `node tools/serve-ui.mjs` を実行します。同じ PC の Google Chrome で `http://127.0.0.1:8080/` を開きます。サーバーがすでに起動していれば、そのまま同じアドレスを開きます。
+2. Node.js が入った Windows PC では、[serve-ui.bat](tools/serve-ui.bat) をダブルクリックし、起動したウィンドウを開いたままにします。コマンドで起動する場合は、リポジトリ直下で `node tools/serve-ui.mjs` を実行します。同じ PC の Google Chrome で `http://127.0.0.1:8080/` を開きます。サーバーがすでに起動していれば、そのまま同じアドレスを開きます。
 3. Atom Lite の本体ボタンを約1.5秒押します。内蔵 LED が水色になり、60秒間 BLE 接続を受け付けます。その間に Chrome の「BLE 接続」を押し、機器一覧から `AtomPixel-XXXXXX` を選びます。OS がペアリングを求めた場合は、表示された機器を確認して承認します。
 4. 画面に「接続済み」と表示され、内蔵 LED が緑になったら、[LED を操作する](#led-を操作する)に進みます。
 
