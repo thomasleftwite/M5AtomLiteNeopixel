@@ -39,8 +39,8 @@ const char UI_PAGE[] PROGMEM = R"ATOMHTML(<!doctype html>
     </label>
     <label>色 <input id="color" type="color" value="#ffffff"></label>
     <label>明るさ（機器の上限に対する割合）<input id="brightness" type="range" min="0" max="100" value="50"></label>
-    <label>速度 <input id="speed" type="range" min="0" max="100" value="50">
-      <output id="speedValue" for="speed">50%</output>
+    <label>速度 <input id="speed" type="range" min="0.1" max="10" step="0.1" value="0.8">
+      <output id="speedValue" for="speed">0.8 cycle/sec</output>
     </label>
     <button type="submit">反映する</button>
   </fieldset>
@@ -100,16 +100,17 @@ function updatePatternControls(restoredSpeed) {
   const previousSpeed = Number(speed.value);
   color.disabled = isRainbow;
   if (isRainbow !== rainbowSpeed) {
-    speed.min = isRainbow ? '1' : '0';
-    speed.max = isRainbow ? '60' : '100';
-    speed.value = isRainbow ? 1 + Math.round(previousSpeed * 59 / 100)
-      : Math.round((previousSpeed - 1) * 100 / 59);
+    const progress = rainbowSpeed ? (previousSpeed - 1) / 59 : (previousSpeed - 0.1) / 9.9;
+    speed.min = isRainbow ? '1' : '0.1';
+    speed.max = isRainbow ? '60' : '10';
+    speed.step = isRainbow ? '1' : '0.1';
+    speed.value = isRainbow ? 1 + Math.round(progress * 59) : (0.1 + progress * 9.9).toFixed(1);
     rainbowSpeed = isRainbow;
   }
-  if (restoredSpeed !== undefined) speed.value = restoredSpeed;
+  if (restoredSpeed !== undefined) speed.value = isRainbow ? restoredSpeed : Math.max(1, restoredSpeed) / 10;
   byId('speedValue').textContent = isRainbow
     ? (speed.value === '60' ? '1' : speed.value + '/60') + ' cycle/sec'
-    : speed.value + '%';
+    : speed.value + ' cycle/sec';
 }
 
 function showState(bytes) {
@@ -130,8 +131,10 @@ function showState(bytes) {
 
 function selectedState() {
   const rgb = Number.parseInt(color.value.slice(1), 16);
-  return Uint8Array.of(Number(pattern.value), rgb >> 16, (rgb >> 8) & 255,
-    rgb & 255, Number(byId('brightness').value), Number(speed.value), Number(ledCount.value));
+  const selectedPattern = Number(pattern.value);
+  const rate = selectedPattern === RAINBOW ? Number(speed.value) : Math.round(Number(speed.value) * 10);
+  return Uint8Array.of(selectedPattern, rgb >> 16, (rgb >> 8) & 255,
+    rgb & 255, Number(byId('brightness').value), rate, Number(ledCount.value));
 }
 
 async function requestState(bytes) {
