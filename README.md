@@ -1,6 +1,6 @@
 # M5AtomLiteNeopixel
 
-M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.2.1`。LED 個数、色、明るさ、速度、消灯、固定点灯、点滅、フェード、レインボーに対応します。[開発計画](DEVELOPMENT_PLAN.md)
+M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.2.2`。LED 個数、色、明るさ、速度、消灯、固定点灯、点滅、フェード、レインボーに対応します。Android の通常操作には同じ LAN 上の Wi-Fi モードを使います。[開発計画](DEVELOPMENT_PLAN.md)
 
 ## 構成と配線
 
@@ -52,7 +52,7 @@ arduino-cli monitor --port COMx --config baudrate=115200
 
 ## 起動と Chrome からの操作
 
-初回起動は BLE です。通常起動では前回のモードを復元します。モードを変更するには、本体ボタンを押した状態で電源を入れ、約0.5秒以上押し続けてから放します。BLE と Wi-Fi が切り替わり、選択したモードが保存されます。点灯設定は機器の稼働中に保持され、再起動すると既定の消灯状態に戻ります。
+通常起動は毎回 BLE です。Wi-Fi を使うときは、本体ボタンを押したまま電源を入れ、約1秒待ってから放します。Wi-Fi の接続先は保存され、次回の Wi-Fi 起動時に再利用されます。点灯設定は機器の稼働中に保持され、再起動すると既定の消灯状態に戻ります。
 
 ### BLE で接続する
 
@@ -66,18 +66,28 @@ BLE を切断しても、Atom Lite は直前の点灯設定で動作を続けま
 
 Windows で初回接続時に `Connection attempt failed` が出る場合は、本体ボタンを長押しして水色にし、Windows の Bluetooth 設定で `AtomPixel-XXXXXX` をペアリングしてから Chrome で接続を試してください。機器の状態取得と操作には暗号化された BLE 接続が必要です。[Microsoft の Bluetooth 開発者向け FAQ](https://learn.microsoft.com/en-us/windows/uwp/devices-sensors/bluetooth-dev-faq)
 
-単体 HTML は `node tools/serve-ui.mjs --export <新規HTMLファイル>` で取り出せます。Android の Chrome での直接起動とループバック配信、および ChatGPT 内蔵ブラウザでの BLE 操作は未確認です。
+単体 HTML は `node tools/serve-ui.mjs --export <新規HTMLファイル>` で取り出せます。Android では下記の Wi-Fi 手順を使用します。ChatGPT 内蔵ブラウザでの BLE 操作は未確認です。
 
 ファームウェアの更新後は、`serve-ui.mjs` を再起動して Chrome の画面を再読み込みしてください。単体 HTML を使う場合は最新版を書き出します。
 
 ### Wi-Fi で接続する
 
-1. Wi-Fi モードへ切り替えます。接続情報が未設定なら、内蔵 LED が橙色になります。接続情報の変更時は、起動後に本体ボタンを約1.5秒押します。
-2. USB シリアル端末を 115200 bps、ローカルエコーと記録をオフに設定します。橙色の間に、設定用 AP 専用の一時パスワードを入力し、改行を送信します。利用できる文字は半角の `!` から `~` までで、8〜32文字です。ファームウェアは入力を表示しません。
-3. 内蔵 LED が紫色になったら、端末から `AtomPixel-XXXXXX` の Wi-Fi に一時パスワードで接続します。`http://192.168.4.1/` を開き、接続先の 2.4 GHz Wi-Fi を設定します。設定用 AP は3分で閉じます。
-4. 内蔵 LED が緑色になったら、端末を設置先 LAN に戻します。USB シリアルに表示された `http://<Atom LiteのIPv4アドレス>/` を Chrome で開きます。
+1. 本体ボタンを押したまま電源を入れ、約1秒後に放します。接続先が未設定なら、WiFiManager がすぐに設定用 AP を開きます。設定済みなら保存先に接続を試み、約15秒以内に接続できなければ設定用 AP を開きます。内蔵 LED の紫色が設定の合図です。接続先を変更したいときは、Wi-Fi モードの起動後にボタンを約1.5秒押すと手動で設定用 AP を開けます。
+2. スマホの Wi-Fi 設定で `AtomPixel-XXXXXX` に接続します。設定用 AP はパスワードなしで、接続成功時か設定待ちが3分経過したときに閉じます。Android に「インターネット接続なし」と表示されたら、接続を維持します。
+3. 設定画面が自動で開かなければ Chrome で `http://192.168.4.1/` を開きます。「Configure WiFi」で接続先の 2.4 GHz Wi-Fi を選び、そのネットワークのパスワードを入力して保存します。
+4. 内蔵 LED が緑色になったら、スマホを同じ LAN の Wi-Fi に戻します。ルーターの接続機器一覧で `AtomPixel-XXXXXX` の IPv4 アドレスを確認し、Chrome で `http://<Atom LiteのIPv4アドレス>/` を開きます。IPv4 アドレスは USB シリアル（115200 bps）でも確認できます。
+
+設定画面への通信は暗号化されないため、周囲を管理できる場所で初期設定と再設定を行います。
 
 外出先から使う場合は、設置先の VPN に接続し、同じ IPv4 アドレスを開きます。VPN 側で Atom Lite への到達を許可する端末を設定します。通常操作の HTTP は設置先の信頼できる LAN と VPN 内で使用します。電源投入後に緑色にならない場合は、2.4 GHz Wi-Fi と保存設定を確認し、手順1から設定し直します。
+
+#### Android の通常操作
+
+1. 上の手順でスマホから Atom Lite の Wi-Fi を初期設定し、Atom Lite の IPv4 アドレスを控えます。
+2. Android を Atom Lite に到達できる同じ LAN の Wi-Fi に接続します。端末間通信を遮断するゲスト用ネットワークの場合は、端末間通信が可能な Wi-Fi を使います。
+3. Android の Google Chrome で `http://<Atom LiteのIPv4アドレス>/` を開きます。「Wi-Fi · Atom Lite の操作画面」で設定を選び、「反映する」を押します。
+
+初期設定と通常操作はスマホだけで行えます。操作画面は Atom Lite 本体が配信します。
 
 ## 制御データと転送
 
@@ -102,7 +112,7 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 | --- | --- |
 | [AtomNeoPixel.ino](firmware/AtomNeoPixel/AtomNeoPixel.ino) | `setup()` は LED・ボタン・描画タスクを初期化し、`heldAtStartup()` で起動モードを判定します。`loop()` は選んだ通信モードを処理し、`checkButton()` は起動後の長押しを検出します。 |
 | [AtomNeoPixel.ino の描画](firmware/AtomNeoPixel/AtomNeoPixel.ino#L43) | `applyState()` は受け取った状態を描画キューに渡します。`renderTask()` は時間に応じた色と明るさを計算し、WS2812B と内蔵 LED を更新します。 |
-| [AtomNeoPixel.ino の Wi-Fi と HTTP](firmware/AtomNeoPixel/AtomNeoPixel.ino#L84) | `beginWifi()`・`resumeStation()`・`tickWifi()` は Wi-Fi の起動、再接続、Web サーバーの運転を管理します。`requestPortal()`・`readPortalPassword()`・`clearPortalPassword()` は設定用 AP の開始と一時パスワードの扱いを担当します。`configureWeb()`・`stopWeb()` は HTTP 処理を設定・停止し、`requireLocalAddress()`・`hexDigit()`・`parseHttpState()`・`sendState()` が宛先確認と状態の変換を行います。 |
+| [AtomNeoPixel.ino の Wi-Fi と HTTP](firmware/AtomNeoPixel/AtomNeoPixel.ino#L84) | `beginWifi()`・`resumeStation()`・`tickWifi()` は Wi-Fi の起動、再接続、Web サーバーの運転を管理します。`startSetupPortal()` は WiFiManager の設定用 AP を開きます。`configureWeb()`・`stopWeb()` は HTTP 処理を設定・停止し、`requireLocalAddress()`・`hexDigit()`・`parseHttpState()`・`sendState()` が宛先確認と状態の変換を行います。 |
 | [BleControl.cpp](firmware/AtomNeoPixel/BleControl.cpp) | `begin()` は GATT サービスと暗号化を設定します。`openWindow()`・`windowOpen()`・`tick()` は60秒の受付と広告の開始・停止を管理します。接続コールバックと `isConnected()` が接続状態を保持します。書き込みコールバックは状態を検証してキューに入れ、`publishState()` で読み取り値を更新して通知します。`takeCommand()` がキューから本体処理へ状態を渡します。 |
 | [LedState.h](firmware/AtomNeoPixel/LedState.h) | `encodeState()`・`decodeState()` は状態の変換と入力検証を担当します。`cyclePhase()`・`rainbowHue()`・`frameBrightness()` が各パターンの周期、色相、明るさを計算します。 |
 | [WebUi.h](firmware/AtomNeoPixel/WebUi.h) | `updateControls()`・`updatePatternControls()` が接続状態とパターンに応じて入力欄を切り替えます。`selectedState()`・`showState()` は画面と状態データを変換します。`refreshState()`・`requestState()` と接続・送信イベントが BLE または HTTP で転送します。`toHex()`・`fromHex()`・`fromView()` は転送形式を変換し、`withControls()`・`onDisconnect()`・`clearConnection()` が処理中や切断時の表示を管理します。 |
@@ -110,4 +120,4 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 
 ## 動作確認の範囲
 
-Windows の Google Chrome から BLE で接続し、WS2812B のレインボー速度と LED 個数の変更を実機で確認済みです。Windows の BLE API から送った赤・緑・青・消灯も、外付け LED の表示と読み戻した状態が一致しました。点滅とフェードの周期端点はコードと画面の模擬試験で検証しました。Wi-Fi 接続中の白点灯は実機で確認されており、Wi-Fi の復旧手順、VPN 経由、macOS・Android での BLE は今後の検証対象です。[検証記録](DEVELOPMENT_PLAN.md#2026-11-06-検証記録)
+Windows の Google Chrome から BLE で接続し、WS2812B のレインボー速度と LED 個数の変更を実機で確認済みです。Windows の BLE API から送った赤・緑・青・消灯も、外付け LED の表示と読み戻した状態が一致しました。点滅とフェードの周期端点はコードと画面の模擬試験で検証しました。Wi-Fi 接続中の白点灯は実機で確認済みです。Android の Chrome からの LAN 操作、Wi-Fi の復旧手順、VPN 経由、macOS での BLE は今後の検証対象です。[検証記録](DEVELOPMENT_PLAN.md#2026-11-06-検証記録)

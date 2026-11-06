@@ -1,10 +1,10 @@
 #include <Adafruit_NeoPixel.h>
-#include <Preferences.h>
 #include <WebServer.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <esp_wifi.h>
 #include <atomic>
+#include <iterator>
 
 #include "BleControl.h"
 #include "LedState.h"
@@ -15,7 +15,7 @@ constexpr uint8_t INDICATOR_PIN = 27;
 constexpr uint8_t BUTTON_PIN = 39;
 constexpr uint32_t MODE_HOLD_MS = 500;
 constexpr uint32_t BUTTON_HOLD_MS = 1500;
-constexpr uint32_t PASSWORD_TIMEOUT_MS = 120000;
+constexpr uint32_t WIFI_STARTUP_TIMEOUT_MS = 15000;
 constexpr uint32_t RECONNECT_INTERVAL_MS = 15000;
 constexpr char API_PATH[] = "/api/state";
 constexpr char CONTROL_HEADER[] = "X-Atom-Control";
@@ -30,15 +30,11 @@ std::atomic<uint32_t> indicatorColor{0};
 bool wifiMode = false;
 bool webRunning = false;
 bool wifiConfigured = false;
+bool checkingSavedWifi = false;
 bool portalActive = false;
 uint32_t lastReconnect = 0;
 String webAddress;
 char deviceName[24];
-bool waitingForPassword = false;
-uint32_t passwordStart = 0;
-char portalPassword[33] = {};
-size_t passwordLength = 0;
-bool invalidPassword = false;
 
 void renderTask(void *) {
   LedState active = DEFAULT_STATE;
@@ -155,22 +151,6 @@ void stopWeb() {
   }
 }
 
-void clearPortalPassword() {
-  memset(portalPassword, 0, sizeof(portalPassword));
-  passwordLength = 0;
-  invalidPassword = false;
-}
-
-void requestPortal() {
-  if (portalActive) return;
-  clearPortalPassword();
-  while (Serial.available()) Serial.read();
-  waitingForPassword = true;
-  passwordStart = millis();
-  Serial.println("Wi-Fi setup: send a temporary 8-32 character ASCII password with newline.");
-  Serial.println("Use characters ! through ~. Device does not echo the password.");
-}
-
 void resumeStation() {
   WiFi.mode(WIFI_STA);
   WiFi.setAutoReconnect(true);
@@ -180,55 +160,40 @@ void resumeStation() {
   lastReconnect = millis();
 }
 
-void readPortalPassword(uint32_t now) {
-  if (!waitingForPassword) return;
-  if (now - passwordStart >= PASSWORD_TIMEOUT_MS) {
-    waitingForPassword = false;
-    clearPortalPassword();
-    Serial.println("Wi-Fi setup request expired.");
+void startSetupPortal() {
+  if (portalActive) return;
+  checkingSavedWifi = false;
+  stopWeb();
+  WiFi.setAutoReconnect(false);
+  WiFi.disconnect();
+  wifiManager.startConfigPortal(deviceName);
+  // WiFiManager sets its active flag even if SoftAP startup fails.
+  portalActive = wifiManager.getConfigPortalActive() && WiFi.softAPSSID() == deviceName
+                 && WiFi.softAPIP() != IPAddress(0, 0, 0, 0);
+  if (!portalActive) {
+    if (wifiManager.getConfigPortalActive()) wifiManager.stopConfigPortal();
+    Serial.println("Wi-Fi setup AP could not start.");
+    resumeStation();
     return;
   }
-  for (unsigned remaining = 64; remaining > 0 && Serial.available(); --remaining) {
-    const int character = Serial.read();
-    if (character == '\r' || character == '\n') {
-      if (passwordLength == 0 && !invalidPassword) continue;
-      if (invalidPassword || passwordLength < 8) {
-        clearPortalPassword();
-        Serial.println("Invalid setup password. Send 8-32 printable ASCII characters.");
-        continue;
-      }
-      waitingForPassword = false;
-      stopWeb();
-      WiFi.setAutoReconnect(false);
-      WiFi.disconnect();
-      wifiManager.startConfigPortal(deviceName, portalPassword);
-      clearPortalPassword();
-      portalActive = wifiManager.getConfigPortalActive();
-      if (portalActive) {
-        wifiManager.server->removeRoute("/update", HTTP_GET);
-        wifiManager.server->removeRoute("/u", HTTP_POST);
-        Serial.printf("Join setup AP %s and open http://192.168.4.1/\n", deviceName);
-      } else {
-        Serial.println("Wi-Fi setup AP could not start.");
-        resumeStation();
-      }
-      return;
-    }
-    if (character < '!' || character > '~' || passwordLength == sizeof(portalPassword) - 1) {
-      invalidPassword = true;
-    } else {
-      portalPassword[passwordLength++] = static_cast<char>(character);
-    }
-  }
+  wifiManager.server->removeRoute("/update", HTTP_GET);
+  wifiManager.server->removeRoute("/u", HTTP_POST);
+  wifiManager.server->removeRoute("/erase");
+  wifiManager.server->removeRoute("/restart");
+  Serial.printf("Join setup AP %s and open http://192.168.4.1/\n", deviceName);
 }
 
 void beginWifi() {
+  WiFi.setHostname(deviceName);
   wifiManager.setDebugOutput(false);
   wifiManager.setConfigPortalBlocking(false);
   wifiManager.setConfigPortalTimeout(180);
   wifiManager.setAPClientCheck(false);
   wifiManager.setWebPortalClientCheck(false);
+  const char *setupMenu[] = {"wifi", "exit"};
+  wifiManager.setMenu(setupMenu, std::size(setupMenu));
   wifiManager.setShowInfoUpdate(false);
+  wifiManager.setShowInfoErase(false);
   wifiManager.setWiFiAutoReconnect(false);
   wifiManager.setConnectTimeout(8);
   wifiManager.setSaveConnectTimeout(8);
@@ -241,12 +206,12 @@ void beginWifi() {
   });
   configureWeb();
   resumeStation();
-  if (!wifiConfigured) requestPortal();
+  checkingSavedWifi = wifiConfigured;
+  if (!checkingSavedWifi) startSetupPortal();
 }
 
-void tickWifi(uint32_t now) {
-  readPortalPassword(now);
-  now = millis();
+void tickWifi() {
+  uint32_t now = millis();
   if (portalActive) {
     wifiManager.process();
     portalActive = wifiManager.getConfigPortalActive();
@@ -256,12 +221,17 @@ void tickWifi(uint32_t now) {
   }
   if (WiFi.status() != WL_CONNECTED) {
     stopWeb();
+    if (checkingSavedWifi) {
+      if (now - lastReconnect >= WIFI_STARTUP_TIMEOUT_MS) startSetupPortal();
+      return;
+    }
     if (wifiConfigured && now - lastReconnect >= RECONNECT_INTERVAL_MS) {
       lastReconnect = now;
       WiFi.reconnect();
     }
     return;
   }
+  checkingSavedWifi = false;
   const String address = WiFi.localIP().toString();
   if (!webRunning || address != webAddress) {
     stopWeb();
@@ -290,7 +260,7 @@ void checkButton(uint32_t now) {
     downSince = now;
   } else if (armed && now - downSince >= BUTTON_HOLD_MS) {
     armed = false;
-    if (wifiMode) requestPortal();
+    if (wifiMode) startSetupPortal();
     else BleControl::openWindow();
   }
 }
@@ -298,6 +268,7 @@ void checkButton(uint32_t now) {
 void setup() {
   Serial.begin(115200);
   pinMode(BUTTON_PIN, INPUT);
+  wifiMode = heldAtStartup();
   strip.begin();
   strip.clear();
   strip.show();
@@ -312,18 +283,6 @@ void setup() {
   snprintf(deviceName, sizeof(deviceName), "AtomPixel-%06lX",
            static_cast<unsigned long>((ESP.getEfuseMac() >> 24) & 0xffffff));
 
-  Preferences preferences;
-  if (preferences.begin("atom-pixel")) {
-    wifiMode = preferences.getBool("wifi", false);
-    if (heldAtStartup()) {
-      wifiMode = !wifiMode;
-      if (!preferences.putBool("wifi", wifiMode)) Serial.println("Could not save boot mode.");
-    }
-    preferences.end();
-  } else {
-    Serial.println("Could not open boot preferences.");
-    wifiMode = heldAtStartup();
-  }
   if (wifiMode) {
     Serial.println("Mode: Wi-Fi");
     beginWifi();
@@ -337,9 +296,8 @@ void loop() {
   const uint32_t now = millis();
   checkButton(now);
   if (wifiMode) {
-    tickWifi(now);
-    if (waitingForPassword) indicatorColor = 0x080400;  // Amber
-    else if (portalActive) indicatorColor = 0x060008;   // Violet
+    tickWifi();
+    if (portalActive) indicatorColor = 0x060008;  // Violet
     else indicatorColor = webRunning ? 0x000800 : 0x000008;
   } else {
     BleControl::tick();
