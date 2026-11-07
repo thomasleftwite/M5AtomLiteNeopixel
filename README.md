@@ -154,6 +154,15 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 | [WebUi.h](firmware/AtomNeoPixel/WebUi.h) | `updateControls()`・`updatePatternControls()` が接続状態とパターンに応じて入力欄を切り替えます。`selectedState()`・`showState()` は画面と状態データを変換します。`refreshState()`・`requestState()` と接続・送信イベントが BLE または HTTP で転送します。`toHex()`・`fromHex()`・`fromView()` は転送形式を変換し、`withControls()`・`onDisconnect()`・`clearConnection()` が処理中や切断時の表示を管理します。 |
 | [serve-ui.mjs](tools/serve-ui.mjs)・[sketch.yaml](firmware/AtomNeoPixel/sketch.yaml) | ランチャーはファームウェアに同梱した GUI を端末内で配信し、単体 HTML にも書き出せます。スケッチのプロファイルは対象ボードと依存関係の版を固定します。 |
 
+## 依存ライブラリ
+
+使用バージョンは [sketch.yaml](firmware/AtomNeoPixel/sketch.yaml) の `atom` プロファイルで固定しています。
+
+| ライブラリ | バージョン | 用途 |
+| --- | --- | --- |
+| WiFiManager | 2.0.17 | 設定用 AP と Web 画面を提供し、Wi-Fi 接続先を設定します。 |
+| Adafruit NeoPixel | 1.15.2 | 外付け WS2812B と内蔵 LED の点灯を制御します。 |
+
 ## 動作確認の範囲
 
 - **BLE**。Windows の Google Chrome でレインボー速度と LED 個数の変更を実機で確認しました。Windows の BLE API から送った赤・緑・青・消灯も、外付け LED の表示と読み戻した状態が一致しました。
