@@ -1,6 +1,6 @@
 # M5AtomLiteNeopixel
 
-M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.2.3`。LED 個数、色、明るさ、速度、消灯、固定点灯、点滅、フェード、レインボーに対応します。Android の通常操作には同じ LAN 上の Wi-Fi モードを使います。[開発計画](DEVELOPMENT_PLAN.md)
+M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.2.4`。LED 個数、色、明るさ、速度、消灯、固定点灯、点滅、フェード、レインボーに対応します。Android の通常操作には同じ LAN 上の Wi-Fi モードを使います。`v0.2.4` では内蔵 LED による IP アドレス表示を追加しました。LED の読み取り値と USB シリアル通知の一致は確認済みです。今回の環境での Web 操作の検証は、ルーターの端末間通信制限の可能性があるため保留しています（原因未確定）。[開発計画](DEVELOPMENT_PLAN.md)
 
 ## 構成と配線
 
@@ -78,15 +78,34 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 
 #### Wi-Fi の初期設定と接続先の変更
 
-1. 本体ボタンを押したまま電源を入れ、約1秒後に放します。保存先に接続できると内蔵 LED が緑になります。そのまま使う場合は [IP アドレスを確認する](#ip-アドレスを確認する)に進みます。
+1. 本体ボタンを押したまま電源を入れ、約1秒後に放します。保存先に接続できると内蔵 LED が緑の点滅で IP アドレスを表示します。そのまま使う場合は [IP アドレスを確認する](#ip-アドレスを確認する)に進みます。
 2. 接続先が未設定ならすぐに、保存先に接続できなければ約15秒で、WiFiManager が設定用 AP を開きます。保存先につながっていて接続先を変更したいときは、起動後に本体ボタンを約1.5秒押します。内蔵 LED の紫色が、設定用 AP が開いた合図です。
 3. スマホの Wi-Fi 設定で `AtomPixel-XXXXXX` に接続します。設定用 AP に接続するパスワードは不要です。Android で「インターネット接続なし」と表示されたら、接続を維持します。
 4. 設定画面が自動で開かなければ Chrome で `http://192.168.4.1/` を開きます。「Configure WiFi」で接続先の 2.4 GHz Wi-Fi を選び、そのネットワークのパスワードを入力して保存します。
-5. 接続に成功すると設定用 AP が閉じ、内蔵 LED が緑になります。スマホを Atom Lite と同じ LAN の Wi-Fi に接続します。設定待ちが3分経過して AP が閉じた場合は、本体ボタンを約1.5秒押して開き直します。
+5. 接続に成功すると設定用 AP が閉じ、内蔵 LED が緑の点滅で IP アドレスを表示します。スマホを Atom Lite と同じ LAN の Wi-Fi に接続します。設定待ちが3分経過して AP が閉じた場合は、本体ボタンを約1.5秒押して開き直します。
 
 設定画面への通信は暗号化されないため、周囲を管理できる場所で初期設定と再設定を行います。
 
 #### IP アドレスを確認する
+
+- **内蔵 LED で確認する**。Wi-Fi に接続して IP アドレスを取得すると、内蔵 LED が緑の点滅でアドレスを繰り返し表示します。ブラウザからのアクセスは不要です。各バイトを先頭ゼロ付きの3桁にし、合計12桁を順に表示します。ドット専用の点滅はありません。
+
+  | 数字 | 点滅（`.` は短、`-` は長） |
+  | ---: | --- |
+  | 0 | `--` |
+  | 1 | `.` |
+  | 2 | `..` |
+  | 3 | `...` |
+  | 4 | `....` |
+  | 5 | `.....` |
+  | 6 | `-.` |
+  | 7 | `-..` |
+  | 8 | `-...` |
+  | 9 | `-....` |
+
+  短は0.2秒点灯、長は0.6秒点灯。同じ数字内の点滅間は0.2秒消灯、同じバイト内の数字間は合計0.8秒消灯、バイト間は合計1.4秒消灯、12桁の最後から次のサイクルまでは合計3秒消灯します。例：`192.168.0.1` は `192.168.000.001` に変換され、`. -.... .. | . -. -... | -- -- -- | -- -- .` と表示されます（`|` はバイト間の消灯区間）。
+
+  切断中は青、設定用 AP の動作中は紫の表示に戻ります。再接続時や IP アドレスが変わったときは、現在のアドレスを先頭から表示します。点滅中も外付け LED の描画と通信処理は継続します。
 
 - **ルーターで確認する**。接続先ルーターの管理画面で「接続機器」または「DHCP クライアント」の一覧を開き、`AtomPixel-XXXXXX` の IPv4 アドレスを確認します。別の Wi-Fi に移したときは、新しいルーターで調べ直します。
 - **USB シリアルで確認する**。ルーターの管理画面を見られない場合は、Wi-Fi 設定を保存する前に Atom Lite を PC に USB 接続し、シリアルモニターを **115200 bps** で開きます。接続に成功すると `Open http://…/` に操作画面のアドレスが表示されます。Arduino CLI でモニターを開くコマンドは [ビルドと書き込み](#ビルドと書き込み)を参照してください。
@@ -131,6 +150,7 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 | [AtomNeoPixel.ino の Wi-Fi と HTTP](firmware/AtomNeoPixel/AtomNeoPixel.ino#L84) | `beginWifi()`・`resumeStation()`・`tickWifi()` は Wi-Fi の起動、再接続、Web サーバーの運転を管理します。`startSetupPortal()` は WiFiManager の設定用 AP を開きます。`configureWeb()`・`stopWeb()` は HTTP 処理を設定・停止し、`requireLocalAddress()`・`hexDigit()`・`parseHttpState()`・`sendState()` が宛先確認と状態の変換を行います。 |
 | [BleControl.cpp](firmware/AtomNeoPixel/BleControl.cpp) | `begin()` は GATT サービスと暗号化を設定します。`openWindow()`・`windowOpen()`・`tick()` は60秒の受付と広告の開始・停止を管理します。接続コールバックと `isConnected()` が接続状態を保持します。書き込みコールバックは状態を検証してキューに入れ、`publishState()` で読み取り値を更新して通知します。`takeCommand()` がキューから本体処理へ状態を渡します。 |
 | [LedState.h](firmware/AtomNeoPixel/LedState.h) | `encodeState()`・`decodeState()` は状態の変換と入力検証を担当します。`cyclePhase()`・`rainbowHue()`・`frameBrightness()` が各パターンの周期、色相、明るさを計算します。 |
+| [IpAddressBlink.h](firmware/AtomNeoPixel/IpAddressBlink.h) | `begin()` が IPv4 アドレスの12桁分の点滅を組み立て、`isOn()` が現在の点灯・消灯を求めます。独立した描画タスクから実行するため、通信処理の待機で点滅を止めません。 |
 | [WebUi.h](firmware/AtomNeoPixel/WebUi.h) | `updateControls()`・`updatePatternControls()` が接続状態とパターンに応じて入力欄を切り替えます。`selectedState()`・`showState()` は画面と状態データを変換します。`refreshState()`・`requestState()` と接続・送信イベントが BLE または HTTP で転送します。`toHex()`・`fromHex()`・`fromView()` は転送形式を変換し、`withControls()`・`onDisconnect()`・`clearConnection()` が処理中や切断時の表示を管理します。 |
 | [serve-ui.mjs](tools/serve-ui.mjs)・[sketch.yaml](firmware/AtomNeoPixel/sketch.yaml) | ランチャーはファームウェアに同梱した GUI を端末内で配信し、単体 HTML にも書き出せます。スケッチのプロファイルは対象ボードと依存関係の版を固定します。 |
 
