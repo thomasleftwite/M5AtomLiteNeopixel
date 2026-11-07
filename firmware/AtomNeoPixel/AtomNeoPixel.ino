@@ -7,6 +7,7 @@
 #include <iterator>
 
 #include "BleControl.h"
+#include "IpAddressBlink.h"
 #include "LedState.h"
 #include "WebUi.h"
 
@@ -26,6 +27,7 @@ WebServer server(80);
 WiFiManager wifiManager;
 LedState state = DEFAULT_STATE;
 QueueHandle_t renderCommands = nullptr;
+QueueHandle_t indicatorCommands = nullptr;  // Packed IPv4; zero stops IP display.
 std::atomic<uint32_t> indicatorColor{0};
 bool wifiMode = false;
 bool webRunning = false;
@@ -37,6 +39,8 @@ String webAddress;
 char deviceName[24];
 
 void renderTask(void *) {
+  IpAddressBlink ipBlink;
+  bool displayingIp = false;
   LedState active = DEFAULT_STATE;
   uint32_t patternStart = millis();
   uint32_t previousColor = 0;
@@ -62,7 +66,13 @@ void renderTask(void *) {
       previousColor = color;
       previousCount = active.ledCount;
     }
-    const uint32_t nextIndicator = indicatorColor;
+    uint32_t address;
+    if (xQueueReceive(indicatorCommands, &address, 0) == pdTRUE) {
+      displayingIp = address != 0;
+      if (displayingIp) ipBlink.begin(address, now);
+    }
+    const uint32_t nextIndicator = displayingIp
+        ? (ipBlink.isOn(now) ? 0x000800 : 0) : indicatorColor.load();
     if (nextIndicator != previousIndicator) {
       indicator.setPixelColor(0, nextIndicator);
       indicator.show();
@@ -146,6 +156,8 @@ void configureWeb() {
 
 void stopWeb() {
   if (webRunning) {
+    const uint32_t noAddress = 0;
+    xQueueOverwrite(indicatorCommands, &noAddress);
     server.stop();
     webRunning = false;
   }
@@ -234,12 +246,20 @@ void tickWifi() {
     return;
   }
   checkingSavedWifi = false;
-  const String address = WiFi.localIP().toString();
+  const IPAddress ip = WiFi.localIP();
+  if (ip == IPAddress(0, 0, 0, 0)) {
+    stopWeb();
+    return;
+  }
+  const String address = ip.toString();
   if (!webRunning || address != webAddress) {
     stopWeb();
     webAddress = address;
     server.begin();
     webRunning = true;
+    const uint32_t packedAddress = (uint32_t(ip[0]) << 24) | (uint32_t(ip[1]) << 16)
+                                  | (uint32_t(ip[2]) << 8) | uint32_t(ip[3]);
+    xQueueOverwrite(indicatorCommands, &packedAddress);
     Serial.printf("Open http://%s/\n", webAddress.c_str());
   }
   server.handleClient();
@@ -278,7 +298,9 @@ void setup() {
   indicator.clear();
   indicator.show();
   renderCommands = xQueueCreate(1, sizeof(LedState));
-  if (!renderCommands || xTaskCreate(renderTask, "atom-led", 3072, nullptr, 1, nullptr) != pdPASS) {
+  indicatorCommands = xQueueCreate(1, sizeof(uint32_t));
+  if (!renderCommands || !indicatorCommands ||
+      xTaskCreate(renderTask, "atom-led", 3072, nullptr, 1, nullptr) != pdPASS) {
     Serial.println("Could not start LED rendering.");
     for (;;) delay(1000);
   }
