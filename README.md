@@ -68,6 +68,8 @@ arduino-cli monitor --port COMx --config baudrate=115200
 
 BLE を切断しても、Atom Lite は直前の点灯設定で動作を続けます。受付時間が過ぎた場合や再接続するときは、手順3からやり直します。
 
+macOS では Node.js をインストールし、リポジトリ直下のターミナルで `bash tools/serve-ui.sh` を実行します。ターミナルを開いたまま、同じ Mac の Google Chrome で `http://127.0.0.1:8080/` を開きます。サーバーの停止は `Ctrl+C` です。
+
 Windows で初回接続時に `Connection attempt failed` が出る場合は、本体ボタンを長押しして水色にし、Windows の Bluetooth 設定で `AtomPixel-XXXXXX` をペアリングしてから Chrome で接続を試してください。機器の状態取得と操作には暗号化された BLE 接続が必要です。[Microsoft の Bluetooth 開発者向け FAQ](https://learn.microsoft.com/en-us/windows/uwp/devices-sensors/bluetooth-dev-faq)
 
 単体 HTML は `node tools/serve-ui.mjs --export <新規HTMLファイル>` で取り出せます。Android で BLE を使う場合の試作アプリは [Android アプリの手順](android/README.md) を参照してください。Android で Wi-Fi を使う場合は下記の手順を使用します。
