@@ -9,6 +9,7 @@
 #include "BleControl.h"
 #include "IpAddressBlink.h"
 #include "LedState.h"
+#include "LedRenderer.h"
 #include "WebUi.h"
 
 constexpr uint8_t LED_PIN = 32;  // WS2812B DIN on the Grove port.
@@ -43,8 +44,6 @@ void renderTask(void *) {
   bool displayingIp = false;
   LedState active = DEFAULT_STATE;
   uint32_t patternStart = millis();
-  uint32_t previousColor = 0;
-  uint8_t previousCount = active.ledCount;
   uint32_t previousIndicator = 0;
   for (;;) {
     const uint32_t now = millis();
@@ -54,18 +53,7 @@ void renderTask(void *) {
       active = command;
     }
     const uint32_t elapsed = now - patternStart;
-    const uint8_t level = frameBrightness(active, elapsed);
-    const uint32_t color = active.pattern == Rainbow
-        ? strip.ColorHSV(rainbowHue(elapsed, active.speed), 255, level)
-        : strip.Color(active.red * level / 255, active.green * level / 255,
-                      active.blue * level / 255);
-    if (color != previousColor || active.ledCount != previousCount) {
-      strip.clear();
-      strip.fill(color, 0, active.ledCount);
-      strip.show();
-      previousColor = color;
-      previousCount = active.ledCount;
-    }
+    renderLedFrame(strip, active, elapsed);
     uint32_t address;
     if (xQueueReceive(indicatorCommands, &address, 0) == pdTRUE) {
       displayingIp = address != 0;
@@ -95,7 +83,7 @@ int hexDigit(char digit) {
 }
 
 bool parseHttpState(const String &body, LedState &command) {
-  if (body.length() != 2 * STATE_SIZE && body.length() != 2 * LEGACY_STATE_SIZE) return false;
+  if (body.length() % 2 != 0 || !supportedStateSize(body.length() / 2)) return false;
   const size_t size = body.length() / 2;
   uint8_t bytes[STATE_SIZE];
   for (size_t i = 0; i < size; ++i) {
