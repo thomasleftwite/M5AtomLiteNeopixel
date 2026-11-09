@@ -1,6 +1,6 @@
 # M5AtomLiteNeopixel
 
-M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.2.4`。LED 個数、色、明るさ、速度、消灯、固定点灯、点滅、フェード、レインボーに対応します。Android の通常操作には同じ LAN 上の Wi-Fi モードを使います。`v0.2.4` では内蔵 LED による IP アドレス表示を追加しました。LED の読み取り値と USB シリアル通知の一致は確認済みです。今回の環境での Web 操作の検証は、ルーターの端末間通信制限の可能性があるため保留しています（原因未確定）。[開発計画](DEVELOPMENT_PLAN.md)
+M5Stack Atom Lite と外付け WS2812B を Chrome から操作する試作版 `v0.3.0`。LED 個数、色、明るさ、速度、消灯、固定点灯、点滅、フェード、レインボーに対応します。`v0.3.0` では既存のレインボーに色相角を追加し、LED ごとに色をずらせるようにしました。Android の通常操作には同じ LAN 上の Wi-Fi モードを使います。内蔵 LED による IP 表示は従来版で読み取り値と USB シリアル通知の一致を確認済みです。2026-11-09に利用者が発色の目視・周期・Wi-Fi接続の確認完了を報告しました。Android BLE用の更新APK 0.2.0も生成し、Android 12実機で起動・Chromeへの引継ぎ・色相角操作を確認しました。利用者がUSBなし・通信オフのスマホ単体操作も確認済みです。[開発計画](DEVELOPMENT_PLAN.md)
 
 ## 構成と配線
 
@@ -32,7 +32,9 @@ Atom Lite の USB 入力側を、Wi-Fi 接続中・WS2812B 12個・試作版 `v0
 
 点滅とフェードの速度は 0.1〜10 cycle/sec（1周10秒〜0.1秒）で、0.1 cycle/sec 刻みです。レインボー以外のパターンにはこの範囲を表示します。
 
-「レインボー」を選ぶと、選択した個数の LED が同じ色で赤から緑・青を経て連続的に循環します。色ピッカーは無効になり、明るさと速度を設定できます。速度は 1/60〜1 cycle/sec（1周60秒〜1秒）で、1分当たり1周刻みです。「反映する」を押すと設定が適用されます。
+「レインボー」を選ぶと、各 LED の色が赤から緑・青を経て連続的に循環します。速度の下の「同時点灯する色相角」は 0〜360 deg、10 deg 刻み、起動時の初期値は360 degです。選択した LED 個数の先頭から末尾まで、両端を含む指定角度を均等に割り当てます。4個・180 deg なら先頭の色相を基準に 0°・60°・120°・180°。360 deg では先頭と末尾が同色になります。0 deg または LED が1個なら従来と同じ全 LED 同色です。
+
+各 LED は色相差を保ち、速度設定に従って色相環全体を一周します。速度は 1/60〜1 cycle/sec（1周60秒〜1秒）で、1分当たり1周刻みです。明るさも設定できます。色ピッカーは無効になり、色相角はレインボー以外でグレイアウトして操作不可になります。パターンを切り替えても色相角の値は保持します。「反映する」で設定一式を送信し、「状態を取得」や再接続で本体の現在値を読み戻します。点灯設定は RAM 上の値で、電源再投入時は初期値に戻ります。
 
 ## ビルドと書き込み
 
@@ -128,7 +130,7 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 
 ## 制御データと転送
 
-「反映する」は現在の設定一式を送ります。BLE と Wi-Fi は同じ7バイトの状態を使います。Chrome は接続時に機器の状態を読み、変更の送信後は BLE の通知または HTTP の応答から状態を取得できます。
+「反映する」は現在の設定一式を送ります。BLE と Wi-Fi は同じ9バイトの状態を使います。Chrome は接続時に機器の状態を読み、変更の送信後は BLE の通知または HTTP の応答から状態を取得できます。
 
 | 位置 | 項目 | 値 |
 | ---: | --- | --- |
@@ -137,11 +139,14 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 | 4 | 明るさ | `0–100`。ファームウェアの輝度上限に対する割合 |
 | 5 | 速度 | レインボーは `1–60` 周／分。他は `1–100` で、値の 1/10 が cycle/sec |
 | 6 | LED 個数 | `1–15` |
+| 7–8 | 同時点灯する色相角 | `0–360`、10 deg 刻み。下位バイト、上位バイトの順。レインボー以外でも値を保持 |
 
-- **BLE**。Chrome が Web Bluetooth で機器を選択し、サービス `251c86a0-3990-4b1e-bb96-5ed47d413b60` に接続します。コマンドの特性 `251c86a1-3990-4b1e-bb96-5ed47d413b60` に応答付きで7バイトを書き込み、状態の特性 `251c86a2-3990-4b1e-bb96-5ed47d413b60` を読み取り・通知登録します。状態の読み取り、コマンドの書き込み、通知登録には暗号化された接続が必要です。
-- **Wi-Fi**。Atom Lite が GUI と同じ IPv4 アドレスで `GET /api/state` と `PUT /api/state` を受け付けます。GET は現在の状態を14桁の16進テキストで返します。PUT は同じ形式を本文に入れ、`Content-Type: text/plain` と `X-Atom-Control: 1` を付けます。適用後の状態が同じ形式で返ります。
+- **BLE**。Chrome が Web Bluetooth で機器を選択し、サービス `251c86a0-3990-4b1e-bb96-5ed47d413b60` に接続します。コマンドの特性 `251c86a1-3990-4b1e-bb96-5ed47d413b60` に応答付きで9バイトを書き込み、状態の特性 `251c86a2-3990-4b1e-bb96-5ed47d413b60` を読み取り・通知登録します。状態の読み取り、コマンドの書き込み、通知登録には暗号化された接続が必要です。
+- **Wi-Fi**。Atom Lite が GUI と同じ IPv4 アドレスで `GET /api/state` と `PUT /api/state` を受け付けます。GET は現在の状態を18桁の16進テキストで返します。PUT は同じ形式を本文に入れ、`Content-Type: text/plain` と `X-Atom-Control: 1` を付けます。適用後の状態が同じ形式で返ります。
 
-例として、固定白・明るさ50%・速度0.8 cycle/sec・12個の状態は `01 ff ff ff 32 08 0c` です。BLE では7バイトのまま、HTTP では `01ffffff32080c` を送ります。旧6バイト形式の点灯コマンドを受け取った場合は、現在の LED 個数と、従来の周波数に最も近い 0.1 cycle/sec 刻みの速度で適用します。
+例として、固定白・明るさ50%・速度0.8 cycle/sec・12個・保持中の色相角360 degの状態は `01 ff ff ff 32 08 0c 68 01` です。HTTP では `01ffffff32080c6801` を送ります。色相角の範囲外・10 deg 刻み以外の値は拒否します。
+
+旧7バイトのコマンドは現在の色相角を保持して受け付けます。旧6バイト形式は色相角と LED 個数を保持し、従来の周波数に最も近い 0.1 cycle/sec 刻みの速度で適用します。応答は常に9バイトです。旧画面は新しい応答を扱えないため、ファームウェアと操作画面を合わせて更新してください。旧 Android APK `0.1.0` は新ファームウェアと互換性がありません。新画面を同梱し、Android 12と通信オフの単体操作を確認した [APK 0.2.0](android/releases/AtomNeoPixel-0.2.0.apk) を使用してください。
 
 ## ソースコードの役割
 
@@ -151,7 +156,8 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 | [AtomNeoPixel.ino の描画](firmware/AtomNeoPixel/AtomNeoPixel.ino#L43) | `applyState()` は受け取った状態を描画キューに渡します。`renderTask()` は時間に応じた色と明るさを計算し、WS2812B と内蔵 LED を更新します。 |
 | [AtomNeoPixel.ino の Wi-Fi と HTTP](firmware/AtomNeoPixel/AtomNeoPixel.ino#L84) | `beginWifi()`・`resumeStation()`・`tickWifi()` は Wi-Fi の起動、再接続、Web サーバーの運転を管理します。`startSetupPortal()` は WiFiManager の設定用 AP を開きます。`configureWeb()`・`stopWeb()` は HTTP 処理を設定・停止し、`requireLocalAddress()`・`hexDigit()`・`parseHttpState()`・`sendState()` が宛先確認と状態の変換を行います。 |
 | [BleControl.cpp](firmware/AtomNeoPixel/BleControl.cpp) | `begin()` は GATT サービスと暗号化を設定します。`openWindow()`・`windowOpen()`・`tick()` は60秒の受付と広告の開始・停止を管理します。接続コールバックと `isConnected()` が接続状態を保持します。書き込みコールバックは状態を検証してキューに入れ、`publishState()` で読み取り値を更新して通知します。`takeCommand()` がキューから本体処理へ状態を渡します。 |
-| [LedState.h](firmware/AtomNeoPixel/LedState.h) | `encodeState()`・`decodeState()` は状態の変換と入力検証を担当します。`cyclePhase()`・`rainbowHue()`・`frameBrightness()` が各パターンの周期、色相、明るさを計算します。 |
+| [LedState.h](firmware/AtomNeoPixel/LedState.h) | `encodeState()`・`decodeState()` は状態の変換と入力検証を担当します。`cyclePhase()`・`rainbowHue()`・`rainbowPixelHue()`・`frameBrightness()` が各パターンの周期、LED ごとの色相、明るさを計算します。 |
+| [LedRenderer.h](firmware/AtomNeoPixel/LedRenderer.h) | `renderLedFrame()` は全15個のピクセル値を比較して更新し、指定個数より後ろを消灯します。いずれかの色が変わったフレームだけ送信します。 |
 | [IpAddressBlink.h](firmware/AtomNeoPixel/IpAddressBlink.h) | `begin()` が IPv4 アドレスの12桁分の点滅を組み立て、`isOn()` が現在の点灯・消灯を求めます。独立した描画タスクから実行するため、通信処理の待機で点滅を止めません。 |
 | [WebUi.h](firmware/AtomNeoPixel/WebUi.h) | `updateControls()`・`updatePatternControls()` が接続状態とパターンに応じて入力欄を切り替えます。`selectedState()`・`showState()` は画面と状態データを変換します。`refreshState()`・`requestState()` と接続・送信イベントが BLE または HTTP で転送します。`toHex()`・`fromHex()`・`fromView()` は転送形式を変換し、`withControls()`・`onDisconnect()`・`clearConnection()` が処理中や切断時の表示を管理します。 |
 | [serve-ui.mjs](tools/serve-ui.mjs)・[sketch.yaml](firmware/AtomNeoPixel/sketch.yaml) | ランチャーはファームウェアに同梱した GUI を端末内で配信し、単体 HTML にも書き出せます。スケッチのプロファイルは対象ボードと依存関係の版を固定します。 |
@@ -166,6 +172,8 @@ Windows で初回接続時に `Connection attempt failed` が出る場合は、�
 | Adafruit NeoPixel | 1.15.2 | 外付け WS2812B と内蔵 LED の点灯を制御します。 |
 
 ## 動作確認の範囲
+
+`v0.3.0` の計算・描画試験は [test-led-state.cpp](tools/test-led-state.cpp)、画面と BLE／HTTP の模擬試験は [test-web-ui.mjs](tools/test-web-ui.mjs) です。前者は C++17 のホストコンパイラでビルドして実行します（例：開発者コマンドプロンプトで `cl /std:c++17 /EHsc /utf-8 tools\test-led-state.cpp /Fe:<出力先.exe> /Fo:<出力先.obj>`）。後者はリポジトリ直下で `node tools/test-web-ui.mjs` を実行します。依存版は従来どおり `sketch.yaml` で固定しています。2026-11-09に両試験とAtom Lite向けビルドが通過し、実ブラウザと模擬APIで色相角の反映・無効化・10 deg刻みの操作を確認しました。COM13への書込み・ハッシュ検証・BLE起動も完了し、実機BLEで全37角度、個数1/4/15、速度1/60、通知・不正値拒否・再接続を確認しました。新しい色相角の発色と周期は、2026-11-09に利用者が実機確認完了を報告しました。周期の測定値・手法は未記録です。[今回の検証記録](docs/VALIDATION_2026-11-09.md)
 
 - **BLE**。Windows の Google Chrome でレインボー速度と LED 個数の変更を実機で確認しました。Windows の BLE API から送った赤・緑・青・消灯も、外付け LED の表示と読み戻した状態が一致しました。
 - **Wi-Fi**。`v0.2.3` で設定用 AP の起動を確認し、利用者が Android で接続先の Wi-Fi を設定して、同じ LAN の Chrome から外付け LED を操作できました。PC から操作画面と状態取得 API の応答も確認しました。Wi-Fi 接続中の白点灯は実機で確認済みです。

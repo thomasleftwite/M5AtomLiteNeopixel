@@ -16,6 +16,8 @@ const char UI_PAGE[] PROGMEM = R"ATOMHTML(<!doctype html>
   select, button { font: inherit; padding: .45rem .8rem; }
   input[type=color] { min-width: 5rem; min-height: 2.5rem; }
   #status { min-height: 2.5em; }
+  #hueSpanControl.inactive { color: GrayText; opacity: .6; }
+  #hueSpanControl.inactive input { filter: grayscale(1); }
 </style>
 <h1>Atom NeoPixel</h1>
 <p id="mode"></p>
@@ -42,6 +44,10 @@ const char UI_PAGE[] PROGMEM = R"ATOMHTML(<!doctype html>
     <label>速度 <input id="speed" type="range" min="0.1" max="10" step="0.1" value="0.8">
       <output id="speedValue" for="speed">0.8 cycle/sec</output>
     </label>
+    <label id="hueSpanControl" class="inactive">同時点灯する色相角
+      <input id="hueSpan" type="range" min="0" max="360" step="10" value="360" disabled>
+      <output id="hueSpanValue" for="hueSpan">360 deg</output>
+    </label>
     <button type="submit">反映する</button>
   </fieldset>
 </form>
@@ -62,6 +68,7 @@ const status = byId('status');
 const pattern = byId('pattern');
 const color = byId('color');
 const speed = byId('speed');
+const hueSpan = byId('hueSpan');
 const ledCount = byId('ledCount');
 for (let count = 1; count <= MAX_LED_COUNT; count++) {
   ledCount.add(new Option(count, count));
@@ -87,7 +94,7 @@ function toHex(bytes) {
 }
 
 function fromHex(hex) {
-  if (!/^(?:[0-9a-f]{2}){6,7}$/i.test(hex)) throw new Error('機器の応答が不正です');
+  if (!/^(?:[0-9a-f]{2}){9}$/i.test(hex)) throw new Error('機器のファームウェアと操作画面を更新してください。');
   return Uint8Array.from(hex.match(/../g), (pair) => Number.parseInt(pair, 16));
 }
 
@@ -99,6 +106,9 @@ function updatePatternControls(restoredSpeed) {
   const isRainbow = Number(pattern.value) === RAINBOW;
   const previousSpeed = Number(speed.value);
   color.disabled = isRainbow;
+  hueSpan.disabled = !isRainbow;
+  byId('hueSpanControl').classList.toggle('inactive', !isRainbow);
+  byId('hueSpanValue').textContent = hueSpan.value + ' deg';
   if (isRainbow !== rainbowSpeed) {
     const progress = rainbowSpeed ? (previousSpeed - 1) / 59 : (previousSpeed - 0.1) / 9.9;
     speed.min = isRainbow ? '1' : '0.1';
@@ -114,9 +124,11 @@ function updatePatternControls(restoredSpeed) {
 }
 
 function showState(bytes) {
-  if (bytes.length === 6) throw new Error('機器のファームウェアを更新してください。');
+  if (bytes.length === 6 || bytes.length === 7) throw new Error('機器のファームウェアを更新してください。');
   const isRainbow = bytes[0] === RAINBOW;
-  if (bytes.length !== 7 || bytes[0] > RAINBOW || bytes[4] > 100
+  const angle = bytes[7] | (bytes[8] << 8);
+  if (bytes.length !== 9 || bytes[0] > RAINBOW || bytes[4] > 100
+      || angle > 360 || angle % 10 !== 0
       || (isRainbow ? bytes[5] < 1 || bytes[5] > 60 : bytes[5] > 100)
       || bytes[6] < 1 || bytes[6] > MAX_LED_COUNT) {
     throw new Error('機器の状態が不正です');
@@ -125,6 +137,7 @@ function showState(bytes) {
   color.value = '#' + toHex(bytes.subarray(1, 4));
   byId('brightness').value = String(bytes[4]);
   ledCount.value = String(bytes[6]);
+  hueSpan.value = String(angle);
   updatePatternControls(bytes[5]);
   edited = false;
 }
@@ -133,8 +146,9 @@ function selectedState() {
   const rgb = Number.parseInt(color.value.slice(1), 16);
   const selectedPattern = Number(pattern.value);
   const rate = selectedPattern === RAINBOW ? Number(speed.value) : Math.round(Number(speed.value) * 10);
+  const angle = Number(hueSpan.value);
   return Uint8Array.of(selectedPattern, rgb >> 16, (rgb >> 8) & 255,
-    rgb & 255, Number(byId('brightness').value), rate, Number(ledCount.value));
+    rgb & 255, Number(byId('brightness').value), rate, Number(ledCount.value), angle & 255, angle >> 8);
 }
 
 async function requestState(bytes) {
@@ -218,7 +232,7 @@ async function refreshState() {
 refresh.addEventListener('click', () => withControls(refreshState));
 byId('controls').addEventListener('input', (event) => {
   edited = true;
-  if (event.target === pattern || event.target === speed) updatePatternControls();
+  if (event.target === pattern || event.target === speed || event.target === hueSpan) updatePatternControls();
 });
 byId('controls').addEventListener('submit', (event) => {
   event.preventDefault();
